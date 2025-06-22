@@ -89,6 +89,16 @@ public class Sucursal {
     @Column(name = "sucursales_nombre", nullable = false, length = 100)
     private String sucursalesNombre;
 
+    @Column(name = "sucursales_latitud")
+    private Double sucursalesLatitud;
+
+    @Column(name = "sucursales_longitud")
+    private Double sucursalesLongitud;
+
+    @Column(name = "sucursales_localidad", length = 100)
+    private String sucursalesLocalidad;
+
+
     // Relación con Comercio (clave compuesta)
     @ManyToOne
     @JoinColumns({
@@ -101,12 +111,17 @@ public class Sucursal {
     public Sucursal() {
     }
 
-    public Sucursal(Long idComercio, Long idBandera, Long idSucursal, Barrio barrio, String sucursalesNombre) {
+    public Sucursal(Long idComercio, Long idBandera, Long idSucursal, Barrio barrio,
+                    String sucursalesNombre, Double sucursalesLatitud,
+                    Double sucursalesLongitud, String sucursalesLocalidad) {
         this.idComercio = idComercio;
         this.idBandera = idBandera;
         this.idSucursal = idSucursal;
         this.barrio = barrio;
         this.sucursalesNombre = sucursalesNombre;
+        this.sucursalesLatitud = sucursalesLatitud;
+        this.sucursalesLongitud = sucursalesLongitud;
+        this.sucursalesLocalidad = sucursalesLocalidad;
     }
 
     // Getters y Setters
@@ -158,6 +173,30 @@ public class Sucursal {
         this.comercio = comercio;
     }
 
+    public Double getSucursalesLatitud() {
+        return sucursalesLatitud;
+    }
+
+    public void setSucursalesLatitud(Double sucursalesLatitud) {
+        this.sucursalesLatitud = sucursalesLatitud;
+    }
+
+    public String getSucursalesLocalidad() {
+        return sucursalesLocalidad;
+    }
+
+    public void setSucursalesLocalidad(String sucursalesLocalidad) {
+        this.sucursalesLocalidad = sucursalesLocalidad;
+    }
+
+    public Double getSucursalesLongitud() {
+        return sucursalesLongitud;
+    }
+
+    public void setSucursalesLongitud(Double sucursalesLongitud) {
+        this.sucursalesLongitud = sucursalesLongitud;
+    }
+
     // toString
     @Override
     public String toString() {
@@ -167,6 +206,9 @@ public class Sucursal {
                 ", idSucursal=" + idSucursal +
                 ", barrio=" + (barrio != null ? barrio.getIdBarrios() : null) +
                 ", sucursalesNombre='" + sucursalesNombre + '\'' +
+                ", sucursalesLatitud=" + sucursalesLatitud +
+                ", sucursalesLongitud=" + sucursalesLongitud +
+                ", sucursalesLocalidad='" + sucursalesLocalidad + '\'' +
                 '}';
     }
 }
