@@ -2,11 +2,14 @@ package com.webapp.comparar.controller;
 
 import com.webapp.comparar.model.Sucursal;
 import com.webapp.comparar.repository.SucursalRepository;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/sucursales")
@@ -80,4 +83,53 @@ public class SucursalController {
     public List<Sucursal> getSucursalesByBarrio(@PathVariable Long idBarrio) {
         return sucursalRepository.findByBarrioIdBarrios(idBarrio);
     }
+
+    @GetMapping("/cercanas")
+    public ResponseEntity<List<Sucursal>> getSucursalesCercanas(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(required = false, defaultValue = "10") int limit) {
+
+        // 1. Obtener todas las sucursales
+        List<Sucursal> todasSucursales = sucursalRepository.findAll();
+
+        // 2. Calcular distancia para cada sucursal y filtrar las más cercanas
+        List<Sucursal> sucursalesCercanas = todasSucursales.stream()
+                .filter(s -> s.getSucursalesLatitud() != null && s.getSucursalesLongitud() != null)
+                .map(s -> {
+                    double distancia = calcularDistancia(
+                            lat, lng,
+                            s.getSucursalesLatitud(),
+                            s.getSucursalesLongitud()
+                    );
+                    // Crear una copia para no modificar la entidad original
+                    Sucursal sucursalConDistancia = new Sucursal();
+                    BeanUtils.copyProperties(s, sucursalConDistancia);
+                    sucursalConDistancia.setDistancia(distancia);
+                    return sucursalConDistancia;
+                })
+                .sorted(Comparator.comparingDouble(Sucursal::getDistancia))
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(sucursalesCercanas);
+    }
+
+    // Método para calcular distancia (Haversine formula)
+    private double calcularDistancia(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Radio de la Tierra en km
+
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+
 }

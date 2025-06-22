@@ -197,6 +197,17 @@ public class Sucursal {
         this.sucursalesLongitud = sucursalesLongitud;
     }
 
+    @Transient
+    private Double distancia;
+
+    // Y su getter y setter
+    public Double getDistancia() {
+        return distancia;
+    }
+
+    public void setDistancia(Double distancia) {
+        this.distancia = distancia;
+    }
     // toString
     @Override
     public String toString() {
