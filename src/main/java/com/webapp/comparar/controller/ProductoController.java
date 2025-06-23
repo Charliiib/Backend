@@ -6,10 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Pageable;
 import java.util.List;
 
@@ -24,11 +21,19 @@ public class ProductoController {
     @GetMapping("/buscar")
     public ResponseEntity<List<Producto>> buscarProductos(
             @RequestParam String termino,
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        // Lógica para verificar autenticación
+        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
+
+        // Limitar a 10 resultados si no está autenticado
+        int maxLimit = isAuthenticated ? 50 : 10; // 10 para anónimos, 50 para autenticados
+        int finalLimit = Math.min(limit, maxLimit);
+
 
         // Dividir el término de búsqueda en palabras individuales
         String[] terminos = termino.toLowerCase().split("\\s+");
-
         // Construir la consulta dinámica
         Specification<Producto> spec = Specification.where(null);
 
