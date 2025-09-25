@@ -46,6 +46,19 @@ public class JwtTokenProvider {
         return Long.parseLong(claims.getSubject());
     }
 
+    public String getUsernameFromJWT(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwtSecret)
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            return claims.getSubject(); // Esto debería devolver el email del usuario
+        } catch (Exception e) {
+            throw new RuntimeException("Error al extraer username del token", e);
+        }
+    }
+
     public boolean validateToken(String authToken) {
         try {
             Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);

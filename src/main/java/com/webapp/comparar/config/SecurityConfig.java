@@ -35,11 +35,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors().configurationSource(corsConfigurationSource()).and()  // Configuración CORS
+                .cors().configurationSource(corsConfigurationSource()).and()
                 .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/productos/**").permitAll()
+                        .requestMatchers("/api/barrios/**").permitAll()
+                        .requestMatchers("/api/comercios/**").permitAll()
+                        .requestMatchers("/api/sucursales/**").permitAll()
+                        .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()
