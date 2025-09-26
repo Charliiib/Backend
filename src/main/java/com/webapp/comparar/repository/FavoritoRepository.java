@@ -26,4 +26,7 @@ public interface FavoritoRepository extends JpaRepository<Favorito, Integer> {
 
     @Transactional
     void deleteByListaIdListasAndIdProducto(Integer idLista, Long idProducto);
+
+    @Transactional
+    void deleteByListaIdListas(Integer idLista);
 }

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -126,6 +127,65 @@ public class ListaController {
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/{idLista}")
+    public ResponseEntity<?> actualizarLista(@PathVariable Integer idLista, @RequestBody Lista listaActualizada) {
+        try {
+            System.out.println("🎯 Actualizando lista: " + idLista);
+
+            // Buscar la lista existente
+            Lista listaExistente = listaRepository.findById(idLista)
+                    .orElseThrow(() -> new RuntimeException("Lista no encontrada"));
+
+            // Verificar que la lista pertenece al usuario (seguridad)
+            // Puedes agregar validaciones adicionales aquí
+
+            // Actualizar solo el nombre (o otros campos permitidos)
+            if (listaActualizada.getNombreLista() != null &&
+                    !listaActualizada.getNombreLista().trim().isEmpty()) {
+                listaExistente.setNombreLista(listaActualizada.getNombreLista().trim());
+            }
+
+            // Actualizar fecha de modificación
+            listaExistente.setFechaActualizacion(LocalDateTime.now());
+
+            // Guardar cambios
+            Lista listaGuardada = listaRepository.save(listaExistente);
+
+            System.out.println("✅ Lista actualizada: " + listaGuardada.getNombreLista());
+            return ResponseEntity.ok(listaGuardada);
+
+        } catch (Exception e) {
+            System.out.println("❌ Error actualizando lista: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error al actualizar la lista: " + e.getMessage());
+        }
+    }
+
+    // Opcional: método para eliminar lista completa
+    @DeleteMapping("/{idLista}")
+    public ResponseEntity<?> eliminarLista(@PathVariable Integer idLista) {
+        try {
+            System.out.println("🎯 Eliminando lista: " + idLista);
+
+            // Verificar que la lista existe
+            if (!listaRepository.existsById(idLista)) {
+                return ResponseEntity.status(404).body("Lista no encontrada");
+            }
+
+            // Primero eliminar todos los favoritos de esta lista
+            favoritoRepository.deleteByListaIdListas(idLista);
+
+            // Luego eliminar la lista
+            listaRepository.deleteById(idLista);
+
+            System.out.println("✅ Lista eliminada correctamente");
+            return ResponseEntity.ok("Lista eliminada correctamente");
+
+        } catch (Exception e) {
+            System.out.println("❌ Error eliminando lista: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error al eliminar la lista: " + e.getMessage());
         }
     }
 }
