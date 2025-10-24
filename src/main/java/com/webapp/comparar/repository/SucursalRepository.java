@@ -8,10 +8,8 @@ import java.util.List;
 
 @Repository
 public interface SucursalRepository extends JpaRepository<Sucursal, Sucursal.SucursalId> {
-    // Métodos personalizados si son necesarios
-    // Ejemplo: Buscar sucursales por nombre
-    // List<Sucursal> findBySucursalesNombreContaining(String nombre);
 
     // Ejemplo: Buscar sucursales por barrio
      List<Sucursal> findByBarrioIdBarrios(Long idBarrio);
+     List<Sucursal> findBySucursalesNombreContainingIgnoreCase(String nombre);
 }

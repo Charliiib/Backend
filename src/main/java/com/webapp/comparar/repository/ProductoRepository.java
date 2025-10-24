@@ -18,6 +18,8 @@ public interface ProductoRepository extends
     @Query("SELECT p FROM Producto p WHERE p.idProducto IN :ids")
     List<Producto> findByIdProductoIn(@Param("ids") List<Long> ids);
 
-    // Alternativa usando el nombre del método de Spring Data (sin @Query)
-    // List<Producto> findByIdProductoIn(List<Long> ids);
+    @Query("SELECT p FROM Producto p WHERE LOWER(p.descripcion) LIKE LOWER(CONCAT('%', :term, '%'))")
+    List<Producto> searchByDescription(@Param("term") String term);
+
+    List<Producto> findByDescripcionContainingIgnoreCase(String productName);
 }

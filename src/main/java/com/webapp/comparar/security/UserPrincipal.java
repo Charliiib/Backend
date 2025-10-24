@@ -49,7 +49,12 @@ public class UserPrincipal implements UserDetails {
         return true;
     }
 
-    public Long getId() {
-        return usuario.getIdUsuario().longValue();
+    // Cambiado de Long a Integer para coincidir con Usuario
+    public Integer getId() {
+        return usuario.getIdUsuario();
+    }
+
+    public String getNombre() {
+        return usuario.getNombreUsuario();
     }
 }

@@ -22,4 +22,12 @@ public interface ProductoPrecioRepository extends JpaRepository<ProductoPrecio, 
             @Param("idComercio") Integer idComercio,
             @Param("idBandera") Integer idBandera,
             @Param("idSucursal") Integer idSucursal);
+
+
+    @Query("SELECT pp.precioLista, s.sucursalesNombre, pp.fechaCarga " +
+            "FROM ProductoPrecio pp " +
+            "JOIN Sucursal s ON pp.idComercio = s.idComercio AND pp.idBandera = s.idBandera AND pp.idSucursal = s.idSucursal " +
+            "WHERE pp.idProducto = :idProducto " +
+            "ORDER BY pp.fechaCarga DESC")
+    List<Object[]> findUltimosPreciosByProducto(@Param("idProducto") Long idProducto);
 }

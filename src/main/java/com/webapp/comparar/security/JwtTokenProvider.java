@@ -24,38 +24,58 @@ public class JwtTokenProvider {
         this.jwtExpirationInMs = expiration;
     }
     public String generateToken(Authentication authentication) {
-        com.webapp.comparar.security.UserPrincipal userPrincipal = (com.webapp.comparar.security.UserPrincipal) authentication.getPrincipal();
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .setSubject(userPrincipal.getUsername()) // Usar email como subject
-                .setIssuedAt(new Date())
+                .setSubject(userPrincipal.getUsername())
+                .claim("userId", userPrincipal.getId()) // Ahora es Integer
+                .claim("nombre", userPrincipal.getNombre())
+                .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(jwtSecret, SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    public Long getUserIdFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody();
-
-        return Long.parseLong(claims.getSubject());
-    }
 
     public String getUsernameFromJWT(String token) {
         try {
-            Claims claims = Jwts.parser()
+            Claims claims = Jwts.parserBuilder() // Usar parserBuilder para consistencia
                     .setSigningKey(jwtSecret)
+                    .build()
                     .parseClaimsJws(token)
                     .getBody();
 
-            return claims.getSubject(); // Esto debería devolver el email del usuario
+            return claims.getSubject();
         } catch (Exception e) {
-            throw new RuntimeException("Error al extraer username del token", e);
+            System.err.println("Error extrayendo username del token: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public Long getUserIdFromJWT(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(jwtSecret)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // Asegurarnos de que el claim "userId" existe y es Long
+            Object userIdClaim = claims.get("userId");
+            if (userIdClaim instanceof Integer) {
+                return ((Integer) userIdClaim).longValue();
+            } else if (userIdClaim instanceof Long) {
+                return (Long) userIdClaim;
+            } else {
+                System.err.println("Tipo de userId inesperado: " + userIdClaim.getClass());
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("Error extrayendo userId del token: " + e.getMessage());
+            return null;
         }
     }
 
@@ -76,6 +96,8 @@ public class JwtTokenProvider {
         }
         return false;
     }
+
+
 
 
 }
