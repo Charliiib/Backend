@@ -1,9 +1,9 @@
 package com.webapp.comparar.controller;
 
-
 import com.webapp.comparar.dto.ProductoPrecioDTO;
 import com.webapp.comparar.model.ProductoPrecio;
 import com.webapp.comparar.repository.ProductoPrecioRepository;
+import com.webapp.comparar.service.ProductoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +21,10 @@ public class ProductoPrecioController {
     @Autowired
     private ProductoPrecioRepository productoPrecioRepository;
 
+    @Autowired
+    private ProductoService productoService;
+
+    // ENDPOINT ORIGINAL (mantener para compatibilidad)
     @GetMapping("/precios")
     public ResponseEntity<List<ProductoPrecioDTO>> getPrecios(
             @RequestParam Long id_producto,
@@ -43,4 +47,18 @@ public class ProductoPrecioController {
 
         return ResponseEntity.ok(dtos);
     }
+
+    // NUEVO ENDPOINT CON BÚSQUEDA CON RESpaldo
+    @GetMapping("/precios-con-respaldo")
+    public ResponseEntity<List<ProductoPrecioDTO>> getPreciosConRespaldo(
+            @RequestParam Long id_producto,
+            @RequestParam Integer id_comercio,
+            @RequestParam Integer id_bandera,
+            @RequestParam Integer id_sucursal) {
+
+        List<ProductoPrecioDTO> resultados = productoService.buscarPreciosConRespaldo(
+                id_producto, id_comercio, id_bandera, id_sucursal);
+
+        return ResponseEntity.ok(resultados);
     }
+}
