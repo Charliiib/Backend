@@ -83,6 +83,20 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope>
 		</dependency>
+
+
+		<!-- Jackson para procesamiento JSON (probablemente ya lo tengas) -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
+		<!-- Lombok (opcional, para reducir boilerplate code) -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
 	</dependencies>
 
 	<build>

@@ -24,4 +24,22 @@ public interface ProductoMaximoRepository extends JpaRepository<ProductoMaximo, 
     @Query("SELECT pm FROM ProductoMaximo pm WHERE " +
             "pm.idProducto = :idProducto")
     List<ProductoMaximo> findByProducto(@Param("idProducto") Long idProducto);
+
+
+    @Query("SELECT pm FROM ProductoMaximo pm WHERE pm.idProducto = :idProducto ORDER BY pm.precioLista ASC")
+    List<ProductoMaximo> findByProductoOrderByPrecioAsc(@Param("idProducto") Long idProducto);
+
+    @Query("SELECT pm FROM ProductoMaximo pm WHERE pm.idProducto = :idProducto AND pm.precioLista = " +
+            "(SELECT MIN(pm2.precioLista) FROM ProductoMaximo pm2 WHERE pm2.idProducto = :idProducto)")
+    List<ProductoMaximo> findPrecioMinimoByProducto(@Param("idProducto") Long idProducto);
+
+    @Query("SELECT pm FROM ProductoMaximo pm WHERE pm.idProducto = :idProducto AND pm.precioLista = " +
+            "(SELECT MAX(pm2.precioLista) FROM ProductoMaximo pm2 WHERE pm2.idProducto = :idProducto)")
+    List<ProductoMaximo> findPrecioMaximoByProducto(@Param("idProducto") Long idProducto);
+
+    // Para análisis por comercio/bandera
+    @Query("SELECT pm.idComercio, pm.idBandera, AVG(pm.precioLista), COUNT(pm) " +
+            "FROM ProductoMaximo pm WHERE pm.idProducto = :idProducto " +
+            "GROUP BY pm.idComercio, pm.idBandera")
+    List<Object[]> findPrecioPromedioPorComercio(@Param("idProducto") Long idProducto);
 }

@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Service
@@ -53,13 +52,8 @@ public class ProductoService {
             return resultados;
         }
 
-        // 3. Si aún no hay resultados, buscar en cualquier sucursal de productosmaximos
-        List<ProductoMaximo> preciosMaximosGlobal = productoMaximoRepository.findByProducto(idProducto);
-
-        for (ProductoMaximo precioMaximo : preciosMaximosGlobal) {
-            resultados.add(convertToDTO(precioMaximo));
-        }
-
+        // 3. Si no hay resultados en el mismo comercio y bandera, devolver lista vacía
+        // Esto evita que productos de un comercio aparezcan en otros comercios
         return resultados;
     }
 
