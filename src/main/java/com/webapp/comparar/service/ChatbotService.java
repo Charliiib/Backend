@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @Service
 public class ChatbotService {
@@ -23,6 +24,7 @@ public class ChatbotService {
     private String apiKey;
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
+    private final Random random = new Random();
 
     @Autowired
     private ChatbotProductosService chatbotProductosService;
@@ -41,17 +43,38 @@ public class ChatbotService {
 
             // 1. Evento de inicio
             Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Analizando tu consulta...");
+            inicioEvent.put("data", "🤖 Analizando tu consulta" +
+                    "<span class='dot-animation'>.</span>" +
+                    "<span class='dot-animation' style='animation-delay: 0.2s;'>.</span>" +
+                    "<span class='dot-animation' style='animation-delay: 0.4s;'>.</span>");
             inicioEvent.put("type", "inicio");
             emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-            Thread.sleep(800);
+            Thread.sleep(2000);
 
-            // 2. Generar receta completa
-            String recetaCompleta = generarRecetaConIA(mensajeUsuario, isAuthenticated);
+            // 2. Generar receta completa - CAPTURAR SI HAY ERROR
+            String recetaCompleta;
+            try {
+                recetaCompleta = generarRecetaConIA(mensajeUsuario, isAuthenticated);
 
-            System.out.println("📝 Receta generada - Longitud: " + recetaCompleta.length() + " caracteres");
+                // Verificar si la respuesta es un mensaje de error
+                if (recetaCompleta.contains("Lo sentimos, estamos experimentando una alta demanda")) {
+                    throw new RuntimeException("Service unavailable - returned error message");
+                }
 
-            // 3. Evento de que empezó la generación
+                System.out.println("📝 Receta generada - Longitud: " + recetaCompleta.length() + " caracteres");
+            } catch (Exception e) {
+                // Si hay error en la generación, enviar mensaje de error y terminar
+                System.err.println("❌ Error al generar receta: " + e.getMessage());
+
+                Map<String, Object> errorEvent = new HashMap<>();
+                errorEvent.put("data", "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒");
+                errorEvent.put("type", "service_error");
+                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
+                emitter.complete();
+                return;
+            }
+
+            // 3. Evento de que empezó la generación (solo si la receta se generó correctamente)
             Map<String, Object> generandoEvent = new HashMap<>();
             generandoEvent.put("data", "📝 Generando receta...");
             generandoEvent.put("type", "empezando");
@@ -59,34 +82,48 @@ public class ChatbotService {
             Thread.sleep(600);
 
             // 4. DIVIDIR POR PALABRAS/FRAGMENTOS y enviar
-            // Split que mantiene los delimitadores (espacios y saltos de línea) como fragmentos separados
             String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
             System.out.println("📊 Número de fragmentos a enviar: " + fragmentos.length);
 
-            long delayFragmento = 50; // 50ms por fragmento para un efecto de escritura natural
+            long delayFragmento = 30; // 30ms por fragmento para un efecto de escritura natural
 
-            int fragmentosEnviados = 0;
             for (int i = 0; i < fragmentos.length; i++) {
                 String fragmento = fragmentos[i];
 
-                if (!fragmento.isEmpty()) {
-                    // Simular el efecto de escritura con un pequeño delay
+                if (!fragmento.trim().isEmpty()) {
                     Thread.sleep(delayFragmento);
 
-                    // Crear evento de línea/fragmento
                     Map<String, Object> lineaEvent = new HashMap<>();
-                    lineaEvent.put("linea", fragmento); // Enviar solo el fragmento
+                    lineaEvent.put("linea", fragmento);
                     lineaEvent.put("indice", i);
                     lineaEvent.put("total", fragmentos.length);
-                    // Progreso usando el total de fragmentos
                     lineaEvent.put("progreso", (i + 1) * 100 / fragmentos.length);
                     lineaEvent.put("esUltimo", i == fragmentos.length - 1);
                     lineaEvent.put("type", "receta");
 
-                    // Enviar el fragmento
                     emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
+                }
+            }
 
-                    fragmentosEnviados++;
+            // 4.1. AGREGAR MENSAJE DE CIERRE GENERATIVO EN EL STREAM
+            String mensajeCierre = generarMensajeCierreGenerico(recetaCompleta);
+
+            String separador = "\n\n---\n\n";
+            String mensajeCompleto = separador + mensajeCierre;
+
+            String[] fragmentosCierre = mensajeCompleto.split("(?<=\\s)|(?<=\\n)");
+            long delayFragmentoCierre = 45;
+
+            for (String fragmento : fragmentosCierre) {
+                if (!fragmento.trim().isEmpty()) {
+                    Thread.sleep(delayFragmentoCierre);
+
+                    Map<String, Object> cierreEvent = new HashMap<>();
+                    cierreEvent.put("linea", fragmento);
+                    cierreEvent.put("progreso", 100);
+                    cierreEvent.put("type", "receta");
+
+                    emitter.send(SseEmitter.event().name("receta").data(cierreEvent));
                 }
             }
 
@@ -107,9 +144,9 @@ public class ChatbotService {
 
             try {
                 Map<String, Object> errorEvent = new HashMap<>();
-                errorEvent.put("data", "❌ Error al generar la receta");
-                errorEvent.put("type", "error");
-                emitter.send(SseEmitter.event().name("error").data(errorEvent));
+                errorEvent.put("data", "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒");
+                errorEvent.put("type", "service_error");
+                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
                 emitter.complete();
             } catch (Exception ex) {
                 emitter.completeWithError(e);
@@ -117,9 +154,99 @@ public class ChatbotService {
         }
     }
 
-    // ELIMINADA la función calcularDelayLinea ya que no es necesaria.
-    // ... (El resto de métodos auxiliares como generarMensajeProductos, obtenerRespuestaIAPlusProductos,
-    // obtenerRespuestaIA, generarRecetaConIA, construirPromptRecetas, generarRecetaDeRespaldo permanecen sin cambios)
+    // =========================================================================
+    // FUNCIÓN MEJORADA: Generar un mensaje de cierre personalizado con IA
+    // =========================================================================
+
+    private String generarMensajeCierreGenerico(String recetaCompleta) {
+
+        // Mensajes de respaldo alternativos
+        String[] fallbackMessages = {
+                "¡Manos a la obra! Espero que te quede deliciosa. 😋",
+                "¡A cocinar! Que esta receta te traiga mucha felicidad. 😊",
+                "Suena increíble, ¡espero que lo disfrutes! 🧑‍🍳",
+                "¡Buen provecho! Avísame si necesitas otra cosa. 😉"
+        };
+
+        String fallback = fallbackMessages[random.nextInt(fallbackMessages.length)];
+
+        try {
+            // Usamos solo el título de la receta como contexto para ser más rápido
+            String titulo = "Receta";
+            int startIndex = recetaCompleta.indexOf("**");
+            int endIndex = recetaCompleta.indexOf("**", startIndex + 2);
+
+            if (startIndex != -1 && endIndex != -1) {
+                titulo = recetaCompleta.substring(startIndex + 2, endIndex).trim();
+            }
+
+            String promptCierre = "Eres un asistente culinario divertido y entusiasta. Genera un mensaje de cierre corto (máximo 15 palabras) y entusiasta relacionado con el título de esta receta, motivando al usuario a cocinar. Usa emojis culinarios y evita listas, títulos o negritas. El título es: " + titulo;
+
+            Map<String, Object> requestBody = new HashMap<>();
+            List<Map<String, Object>> contents = new ArrayList<>();
+            Map<String, Object> content = new HashMap<>();
+            List<Map<String, String>> parts = new ArrayList<>();
+            Map<String, String> part = new HashMap<>();
+            part.put("text", promptCierre);
+            parts.add(part);
+            content.put("parts", parts);
+            contents.add(content);
+            requestBody.put("contents", contents);
+
+            Map<String, Object> generationConfig = new HashMap<>();
+            generationConfig.put("temperature", 1.0); // Aún más creativo
+            generationConfig.put("maxOutputTokens", 50);
+            requestBody.put("generationConfig", generationConfig);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+            String urlWithKey = GEMINI_API_URL + "?key=" + apiKey;
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    urlWithKey,
+                    HttpMethod.POST,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                JsonNode jsonResponse = objectMapper.readTree(response.getBody());
+
+                // 1. Verificar si hay un error de bloqueo de contenido o seguridad
+                if (jsonResponse.has("promptFeedback") && jsonResponse.get("promptFeedback").has("blockReason")) {
+                    System.err.println("API bloqueó la respuesta: " + jsonResponse.get("promptFeedback").get("blockReason").asText());
+                    return fallback;
+                }
+
+                // 2. Extraer el texto de manera segura
+                if (jsonResponse.has("candidates") && jsonResponse.get("candidates").size() > 0) {
+                    JsonNode candidate = jsonResponse.get("candidates").get(0);
+                    if (candidate.has("content") && candidate.get("content").has("parts") && candidate.get("content").get("parts").size() > 0) {
+                        JsonNode part1 = candidate.get("content").get("parts").get(0);
+                        if (part1.has("text")) {
+                            return part1.get("text").asText().trim();
+                        }
+                    }
+                }
+            } else {
+                System.err.println("Error de API al generar cierre - Estado: " + response.getStatusCode());
+                // Podríamos intentar parsear el cuerpo para obtener el error de la API
+                if (response.hasBody()) {
+                    System.err.println("Cuerpo de error: " + response.getBody());
+                }
+            }
+
+            return fallback; // Mensaje de respaldo si el JSON está vacío o mal formado
+
+        } catch (Exception e) {
+            System.err.println("Error al generar mensaje de cierre: " + e.getMessage());
+            e.printStackTrace();
+            return fallback; // Mensaje de respaldo si hay una excepción
+        }
+    }
+
 
     private String generarMensajeProductos(List<IngredienteEncontrado> productos) {
         if (productos == null || productos.isEmpty()) {
@@ -208,12 +335,12 @@ public class ChatbotService {
                 }
             }
 
-            return "Lo siento, no pude generar una respuesta en este momento. Por favor, intenta de nuevo.";
+            return "Lo sentimos, el servicio de recetas está temporalmente saturado. Por favor, vuelve a intentarlo en unos minutos. 🕒";
 
         } catch (Exception e) {
             System.err.println("Error al llamar a Google AI API: " + e.getMessage());
             e.printStackTrace();
-            return "Hubo un error al procesar tu consulta. Por favor, verifica que la API esté configurada correctamente.";
+            return "Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒";
         }
     }
 
@@ -274,11 +401,13 @@ public class ChatbotService {
                 }
             }
 
-            return generarRecetaDeRespaldo(mensajeUsuario);
+            // Retornar mensaje de error en lugar de lanzar excepción
+            return "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒";
 
         } catch (Exception e) {
             System.err.println("Error al llamar a Google AI API: " + e.getMessage());
-            return generarRecetaDeRespaldo(mensajeUsuario);
+            // Retornar mensaje de error en lugar de lanzar excepción
+            return "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒";
         }
     }
 
@@ -309,10 +438,10 @@ public class ChatbotService {
         prompt.append("**TIEMPO ESTIMADO:** X minutos\n");
         prompt.append("**PORCIONES:** X personas\n\n");
 
-        prompt.append("IMPORTANTE: Mantén la receta completa pero evita texto innecesario.\n\n");
+        prompt.append("IMPORTANTE: Mantén la receta completa pero evita texto innecesario.\\n\\n");
 
         if (!isAuthenticated) {
-            prompt.append("NOTA: El usuario no está autenticado.\n\n");
+            prompt.append("NOTA: El usuario no está autenticado.\\n\\n");
         }
 
         prompt.append("CONSULTA DEL USUARIO: ");
@@ -321,20 +450,8 @@ public class ChatbotService {
         return prompt.toString();
     }
 
+    // Este método ya no se usa pero lo puedes mantener como respaldo adicional
     private String generarRecetaDeRespaldo(String mensajeUsuario) {
-        return "🍳 **Receta Casera - " + mensajeUsuario + "**\n\n" +
-                "**INGREDIENTES:**\n" +
-                "- 500g de ingredientes principales\n" +
-                "- 2-3 ingredientes de sabor\n" +
-                "- Especias al gusto\\n" +
-                "- Aceite, sal y pimienta\n\n" +
-                "**PREPARACIÓN:**\n" +
-                "1. Prepara todos los ingredientes\n" +
-                "2. Cocina a fuego medio\n" +
-                "3. Ajusta sabores a tu gusto\n" +
-                "4. Sirve y disfruta!\n\n" +
-                "⏱️ **Tiempo estimado:** 30-45 minutos\n" +
-                "👥 **Porciones:** 4 personas\n\n" +
-                "💡 **Consejo:** ¡Experimenta con diferentes condimentos para personalizar la receta!";
+        return "Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒";
     }
 }
