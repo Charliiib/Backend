@@ -49,7 +49,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/barrios/**").permitAll()
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
-                        .requestMatchers("/api/chat/**").permitAll() // ✅ AÑADIR ESTA LÍNEA
+                        .requestMatchers("/api/chat/**").permitAll()
+                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
+                        .requestMatchers("/api/chatbot/**").authenticated()
                         .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
