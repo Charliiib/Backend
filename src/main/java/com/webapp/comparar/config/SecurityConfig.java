@@ -85,7 +85,8 @@ public class SecurityConfig {
                 "Origin",
                 "X-Requested-With",
                 "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
+                "Access-Control-Request-Headers",
+                "Cache-Control"
         ));
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",

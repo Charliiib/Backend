@@ -30,14 +30,14 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
 
-        boolean shouldNotFilter = path.startsWith("/api/auth/") ||
-                path.startsWith("/api/productos/") ||
-                path.startsWith("/api/barrios/") ||
-                path.startsWith("/api/comercios/") ||
-                path.startsWith("/api/sucursales/") ||
-                path.startsWith("/api/chat/") ||
-                path.startsWith("/api/debug/") ||
-                path.startsWith("/api/chatbot/");
+        boolean shouldNotFilter = path.startsWith("/api/chatbot")
+                || path.startsWith("/api/auth/")
+                || path.startsWith("/api/productos/")
+                || path.startsWith("/api/barrios/")
+                || path.startsWith("/api/comercios/")
+                || path.startsWith("/api/sucursales/")
+                || path.startsWith("/api/chat/")
+                || path.startsWith("/api/debug/");
 
         System.out.println("🔍 JwtRequestFilter - Path: " + path + " | shouldNotFilter: " + shouldNotFilter);
         return shouldNotFilter;
