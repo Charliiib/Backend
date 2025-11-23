@@ -48,7 +48,7 @@ public class ChatbotController {
         Runnable keepAlive = () -> {
             try {
                 while (true) {
-                    Thread.sleep(1000);
+                    Thread.sleep(9000);
 
                     emitter.send(SseEmitter.event()
                             .name("keepalive")
