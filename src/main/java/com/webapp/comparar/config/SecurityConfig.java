@@ -69,7 +69,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
-                "https://frontend-pi-let-42.vercel.app",
+                "https://frontend-pi-jet-42.vercel.app",
                 "https://frontend-cdfgwkdfp-chartie-projects-6b04c52b.vercel.app",
                 "https://*.vercel.app"
         ));
