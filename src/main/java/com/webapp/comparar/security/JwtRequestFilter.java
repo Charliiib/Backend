@@ -29,20 +29,23 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        System.out.println("🔍 shouldNotFilter path = " + path);
 
-        boolean shouldNotFilter = path.startsWith("/api/chatbot")
-                || path.startsWith("/api/auth/")
+        // Ignorar absolutamente TODO lo que empiece por /api/chatbot
+        if (path.startsWith("/api/chatbot")) {
+            System.out.println("🟢 Ignorando JWT para chatbot");
+            return true;
+        }
+
+        // Lo demás como ya lo tenías
+        return path.startsWith("/api/auth/")
                 || path.startsWith("/api/productos/")
                 || path.startsWith("/api/barrios/")
                 || path.startsWith("/api/comercios/")
                 || path.startsWith("/api/sucursales/")
                 || path.startsWith("/api/chat/")
                 || path.startsWith("/api/debug/");
-
-        System.out.println("🔍 JwtRequestFilter - Path: " + path + " | shouldNotFilter: " + shouldNotFilter);
-        return shouldNotFilter;
     }
-
 
 
     @Override
