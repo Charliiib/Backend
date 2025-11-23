@@ -18,6 +18,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+  http2:
+    enabled: false
 
 app:
   jwtSecret: ${APP_JWT_SECRET:TuClaveSecretaMuySeguraQueDebeTenerAlMenos64Caracteres1234567890!@}
