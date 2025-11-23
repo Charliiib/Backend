@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
@@ -62,6 +63,37 @@ public class ChatbotService {
                 }
 
                 System.out.println("📝 Receta generada - Longitud: " + recetaCompleta.length() + " caracteres");
+
+                // VERIFICAR SI ES UNA RESPUESTA DE RECETA VÁLIDA O UNA NEGACIÓN
+                boolean esRecetaValida = esRecetaValida(recetaCompleta);
+                System.out.println("🔍 ¿Es receta válida?: " + esRecetaValida);
+
+                if (!esRecetaValida) {
+                    // Si no es una receta válida, enviar solo la respuesta sin mensaje de cierre
+                    System.out.println("📝 Enviando respuesta sin mensaje de cierre (no es receta)");
+
+                    // 3. Evento de que empezó la generación
+                    Map<String, Object> generandoEvent = new HashMap<>();
+                    generandoEvent.put("data", "📝 Procesando tu consulta...");
+                    generandoEvent.put("type", "empezando");
+                    emitter.send(SseEmitter.event().name("inicio").data(generandoEvent));
+                    Thread.sleep(600);
+
+                    // 4. Enviar la respuesta sin mensaje de cierre
+                    enviarRespuestaFragmentada(recetaCompleta, emitter);
+
+                    // 5. Evento de completado
+                    Thread.sleep(500);
+                    Map<String, Object> completoEvent = new HashMap<>();
+                    completoEvent.put("data", "✅ Consulta completada!");
+                    completoEvent.put("type", "completo");
+                    emitter.send(SseEmitter.event().name("completo").data(completoEvent));
+
+                    System.out.println("🎉 STREAMING COMPLETADO (sin cierre)");
+                    emitter.complete();
+                    return;
+                }
+
             } catch (Exception e) {
                 // Si hay error en la generación, enviar mensaje de error y terminar
                 System.err.println("❌ Error al generar receta: " + e.getMessage());
@@ -74,18 +106,18 @@ public class ChatbotService {
                 return;
             }
 
-            // 3. Evento de que empezó la generación (solo si la receta se generó correctamente)
+            // 3. Evento de que empezó la generación (solo si la receta se generó correctamente Y es válida)
             Map<String, Object> generandoEvent = new HashMap<>();
             generandoEvent.put("data", "📝 Generando receta...");
             generandoEvent.put("type", "empezando");
             emitter.send(SseEmitter.event().name("inicio").data(generandoEvent));
             Thread.sleep(600);
 
-            // 4. DIVIDIR POR PALABRAS/FRAGMENTOS y enviar
+            // 4. DIVIDIR POR PALABRAS/FRAGMENTOS y enviar (solo si es receta válida)
             String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
             System.out.println("📊 Número de fragmentos a enviar: " + fragmentos.length);
 
-            long delayFragmento = 30; // 30ms por fragmento para un efecto de escritura natural
+            long delayFragmento = 30;
 
             for (int i = 0; i < fragmentos.length; i++) {
                 String fragmento = fragmentos[i];
@@ -105,7 +137,7 @@ public class ChatbotService {
                 }
             }
 
-            // 4.1. AGREGAR MENSAJE DE CIERRE GENERATIVO EN EL STREAM
+            // 4.1. SOLO AGREGAR MENSAJE DE CIERRE SI ES UNA RECETA VÁLIDA
             String mensajeCierre = generarMensajeCierreGenerico(recetaCompleta);
 
             String separador = "\n\n---\n\n";
@@ -134,7 +166,7 @@ public class ChatbotService {
             completoEvent.put("type", "completo");
             emitter.send(SseEmitter.event().name("completo").data(completoEvent));
 
-            System.out.println("🎉 STREAMING COMPLETADO");
+            System.out.println("🎉 STREAMING COMPLETADO (con cierre)");
 
             emitter.complete();
 
@@ -150,6 +182,81 @@ public class ChatbotService {
                 emitter.complete();
             } catch (Exception ex) {
                 emitter.completeWithError(e);
+            }
+        }
+    }
+
+    // NUEVO MÉTODO: Verificar si la respuesta es una receta válida
+    private boolean esRecetaValida(String respuesta) {
+        if (respuesta == null || respuesta.trim().isEmpty()) {
+            return false;
+        }
+
+        // Patrones que indican que NO es una receta válida
+        String[] patronesNoReceta = {
+                "no está dentro de mi área",
+                "no puedo ayudarte con eso",
+                "fuera de mi conocimiento",
+                "especialidad son las recetas",
+                "consulta culinaria",
+                "pregunta sobre",
+                "no es una consulta culinaria",
+                "asistente culinario"
+        };
+
+        String respuestaLower = respuesta.toLowerCase();
+
+        for (String patron : patronesNoReceta) {
+            if (respuestaLower.contains(patron.toLowerCase())) {
+                return false;
+            }
+        }
+
+        // Patrones que indican que SÍ es una receta válida
+        String[] patronesReceta = {
+                "**ingredientes:**",
+                "**instrucciones:**",
+                "**tiempo estimado:**",
+                "**porciones:**",
+                "1. ",
+                "2. ",
+                "3. ",
+                "- ",
+                "gramos",
+                "tazas",
+                "cucharadas"
+        };
+
+        for (String patron : patronesReceta) {
+            if (respuestaLower.contains(patron.toLowerCase())) {
+                return true;
+            }
+        }
+
+        // Si no coincide con ningún patrón, asumimos que no es receta
+        return false;
+    }
+
+    // NUEVO MÉTODO: Enviar respuesta fragmentada sin mensaje de cierre
+    private void enviarRespuestaFragmentada(String respuesta, SseEmitter emitter) throws InterruptedException, IOException {
+        String[] fragmentos = respuesta.split("(?<=\\s)|(?<=\\n)");
+        long delayFragmento = 30;
+
+        for (int i = 0; i < fragmentos.length; i++) {
+            String fragmento = fragmentos[i];
+
+            if (!fragmento.trim().isEmpty()) {
+                Thread.sleep(delayFragmento);
+
+                Map<String, Object> lineaEvent = new HashMap<>();
+                lineaEvent.put("linea", fragmento);
+                lineaEvent.put("indice", i);
+                lineaEvent.put("total", fragmentos.length);
+                lineaEvent.put("progreso", (i + 1) * 100 / fragmentos.length);
+                lineaEvent.put("esUltimo", i == fragmentos.length - 1);
+                lineaEvent.put("type", "receta");
+
+                emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
             }
         }
     }
@@ -450,8 +557,5 @@ public class ChatbotService {
         return prompt.toString();
     }
 
-    // Este método ya no se usa pero lo puedes mantener como respaldo adicional
-    private String generarRecetaDeRespaldo(String mensajeUsuario) {
-        return "Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒";
-    }
+
 }
