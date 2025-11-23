@@ -49,24 +49,36 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        final String authorizationHeader = request.getHeader("Authorization");
-
-        String username = null;
+        // ✅ PARA SSE, BUSCAR TOKEN EN QUERY PARAMETER
         String jwt = null;
+        String username = null;
 
-        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-            jwt = authorizationHeader.substring(7);
-
-            // Usar JwtTokenProvider en lugar de JwtTokenUtil
-            if (jwtTokenProvider.validateToken(jwt)) {
-                username = jwtTokenProvider.getUsernameFromJWT(jwt); // Necesitamos agregar este método
+        // Buscar en query parameter primero (para SSE)
+        String tokenParam = request.getParameter("token");
+        if (tokenParam != null && !tokenParam.trim().isEmpty()) {
+            jwt = tokenParam;
+            System.out.println("🔑 Token encontrado en query parameter");
+        }
+        // Buscar en header (para requests normales)
+        else {
+            final String authorizationHeader = request.getHeader("Authorization");
+            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+                jwt = authorizationHeader.substring(7);
+                System.out.println("🔑 Token encontrado en Authorization header");
             }
+        }
+
+        if (jwt != null && jwtTokenProvider.validateToken(jwt)) {
+            username = jwtTokenProvider.getUsernameFromJWT(jwt);
+            System.out.println("✅ Token válido para: " + username);
+        } else if (jwt != null) {
+            System.out.println("❌ Token inválido");
+        } else {
+            System.out.println("ℹ️ Sin token presente");
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
-
-            // Ya validamos el token arriba, así que podemos proceder
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
