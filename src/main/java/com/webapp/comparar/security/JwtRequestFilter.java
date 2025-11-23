@@ -39,8 +39,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 path.startsWith("/api/debug/") ||
                 path.startsWith("/api/chatbot/");
 
-        // ❌ COMENTA temporalmente este log
-        // System.out.println("🔍 JwtRequestFilter - shouldNotFilter: " + shouldNotFilter + " for path: " + path);
+        System.out.println("🔍 JwtRequestFilter - Path: " + path + " | shouldNotFilter: " + shouldNotFilter);
         return shouldNotFilter;
     }
 
@@ -50,34 +49,20 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        // ✅ PARA SSE, BUSCAR TOKEN EN QUERY PARAMETER
-        String jwt = null;
-        String username = null;
+        // ✅ LOG para ver qué requests están pasando por el filter
+        System.out.println("🔍 JwtRequestFilter PROCESANDO: " + request.getRequestURI());
 
-        // Buscar en query parameter primero (para SSE)
-        String tokenParam = request.getParameter("token");
-        if (tokenParam != null && !tokenParam.trim().isEmpty()) {
-            jwt = tokenParam;
-            System.out.println("🔑 Token encontrado en query parameter");
-        }
-        // Buscar en header (para requests normales)
-        else {
-            final String authorizationHeader = request.getHeader("Authorization");
-            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-                jwt = authorizationHeader.substring(7);
-                System.out.println("🔑 Token encontrado en Authorization header");
+        final String authorizationHeader = request.getHeader("Authorization");
+
+        String username = null;
+        String jwt = null;
+
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            jwt = authorizationHeader.substring(7);
+            if (jwtTokenProvider.validateToken(jwt)) {
+                username = jwtTokenProvider.getUsernameFromJWT(jwt);
             }
         }
-
-        if (jwt != null && jwtTokenProvider.validateToken(jwt)) {
-            username = jwtTokenProvider.getUsernameFromJWT(jwt);
-            System.out.println("✅ Token válido para: " + username);
-        } else if (jwt != null) {
-            System.out.println("❌ Token inválido");
-        } else {
-            System.out.println("ℹ️ Sin token presente");
-        }
-
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
