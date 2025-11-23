@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/chatbot/consulta-stream").permitAll()
-                        .requestMatchers("/api/chatbot/**").authenticated()
+                        .requestMatchers("/api/chatbot/**").permitAll()
                         .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
