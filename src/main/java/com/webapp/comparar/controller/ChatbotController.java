@@ -36,7 +36,7 @@ public class ChatbotController {
         System.out.println("📝 Mensaje: " + mensaje);
         System.out.println("🔐 Auth Header presente: " + (authHeader != null));
         System.out.println("🔐 Authentication en contexto: " + SecurityContextHolder.getContext().getAuthentication());
-git
+
         SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
