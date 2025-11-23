@@ -40,6 +40,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println("🔐 CARGANDO SECURITY CONFIG - CHATBOT CONSULTA-STREAM DEBE SER PÚBLICO");
+
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
@@ -51,8 +53,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/chatbot/consulta-stream").permitAll()
-                        .requestMatchers("/api/chatbot/**").permitAll()
-                        .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
+                        .requestMatchers("/api/debug/**").permitAll()
+                        .requestMatchers("/api/chatbot/**").authenticated()
+                        .anyRequest().authenticated()
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()

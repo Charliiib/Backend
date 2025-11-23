@@ -27,6 +27,25 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        // ✅ IGNORAR COMPLETAMENTE ENDPOINTS PÚBLICOS
+        boolean shouldNotFilter = path.startsWith("/api/auth/") ||
+                path.startsWith("/api/productos/") ||
+                path.startsWith("/api/barrios/") ||
+                path.startsWith("/api/comercios/") ||
+                path.startsWith("/api/sucursales/") ||
+                path.startsWith("/api/chat/") ||
+                path.startsWith("/api/debug/") ||
+                path.contains("/api/chatbot/consulta-stream");
+
+        System.out.println("🔍 JwtRequestFilter - shouldNotFilter: " + shouldNotFilter + " for path: " + path);
+        return shouldNotFilter;
+    }
+
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
