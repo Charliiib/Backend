@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -40,8 +41,6 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // ❌ ELIMINA este log que se ejecuta en cada request
-        // System.out.println("🔐 CARGANDO SECURITY CONFIG - CHATBOT CONSULTA-STREAM DEBE SER PÚBLICO");
 
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -54,32 +53,40 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
+
+                        // 🔥 Chatbot TOTALMENTE público (SSE necesita acceso libre)
                         .requestMatchers("/api/chatbot/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // 🔥 IMPORTANTE: permitir SSE
                 .headers(headers -> headers
+                        .frameOptions(frame -> frame.disable())
                         .contentTypeOptions(contentType -> contentType.disable())
-                )
-                .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                .and()
-                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+                );
 
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // Configuración CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
+
+        // 🔥 IMPORTANTE: Railway no funciona bien con allowedOriginPatterns
+        configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://frontend-pi-jet-42.vercel.app",
                 "https://frontend-cdfgwkdfp-chartie-projects-6b04c52b.vercel.app",
                 "https://*.vercel.app"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -87,19 +94,21 @@ public class SecurityConfig {
                 "Origin",
                 "X-Requested-With",
                 "Access-Control-Request-Method",
-                "Access-Control-Request-Headers",
-                "Cache-Control"
+                "Access-Control-Request-Headers"
         ));
+
+        // 🔥 SSE necesita exponer Content-Type
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
-                "Content-Disposition",
                 "Content-Type"
         ));
-        configuration.setAllowCredentials(true); // IMPORTANTE: cambiar a true
-        configuration.setMaxAge(3600L); // Cache preflight por 1 hora
+
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 
