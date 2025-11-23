@@ -1,16 +1,17 @@
-# Use Java 21
-FROM openjdk:21-slim
+# Use Java 21 - imagen oficial de Eclipse Temurin
+FROM eclipse-temurin:21-jdk-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY pom.xml .
+# Copy Maven wrapper and project files
+COPY .mvn/ .mvn
+COPY mvnw pom.xml ./
 COPY src ./src
 
-# Install Maven and build
-RUN apt-get update && apt-get install -y maven && \
-    mvn clean package -DskipTests
+# Make mvnw executable and build the application
+RUN chmod +x mvnw && \
+    ./mvnw clean package -DskipTests
 
 # Expose port
 EXPOSE 8080
