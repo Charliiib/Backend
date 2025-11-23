@@ -44,13 +44,13 @@ public class ChatbotService {
 
             // 1. Evento de inicio
             Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Analizando tu consulta" +
+            inicioEvent.put("data", "⏳ Preparando receta..." +
                     "<span class='dot-animation'>.</span>" +
                     "<span class='dot-animation' style='animation-delay: 0.2s;'>.</span>" +
                     "<span class='dot-animation' style='animation-delay: 0.4s;'>.</span>");
             inicioEvent.put("type", "inicio");
             emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-            Thread.sleep(2000);
+            Thread.sleep(150);
 
             // 2. Generar receta completa - CAPTURAR SI HAY ERROR
             String recetaCompleta;

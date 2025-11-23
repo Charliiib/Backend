@@ -37,7 +37,7 @@ public class ChatbotController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletResponse response) {
 
-        System.out.println("🎯 CHATBOT STREAM INICIADO - mensaje: " + mensaje);
+        System.out.println("🎯 CHATBOT SSE INICIADO — mensaje: " + mensaje);
 
         // Necesario para SSE en Railway
         response.setHeader("Cache-Control", "no-cache");
@@ -45,10 +45,13 @@ public class ChatbotController {
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Content-Type", "text/event-stream");
 
-        // Timeout grande
+        // Timeout infinito
         SseEmitter emitter = new SseEmitter(0L);
 
-        // HEARTBEAT para que Railway NO mate la conexión
+        boolean isAuthenticated =
+                authHeader != null && authHeader.startsWith("Bearer ");
+
+        // ⏱ HEARTBEAT — Railway MATA SSE sin esto
         Timer heartbeat = new Timer(true);
         heartbeat.scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -62,16 +65,30 @@ public class ChatbotController {
                     heartbeat.cancel();
                 }
             }
-        }, 0, 800); // cada 800ms mantener la conexión viva
+        }, 0, 700); // <— enviar algo ANTES del primer segundo
 
-        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
-
+        // Ejecutar Gemini async
         CompletableFuture.runAsync(() -> {
             try {
-                chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
+
+                // EVENTO INICIAL INMEDIATO — CLAVE PARA QUE NO HAYA 401
+                emitter.send(SseEmitter.event()
+                        .name("inicio")
+                        .data("Procesando tu consulta...")
+                );
+
+                chatbotService.obtenerRespuestaConStreaming(
+                        mensaje,
+                        isAuthenticated,
+                        emitter
+                );
+
             } catch (Exception e) {
                 try {
-                    emitter.send(SseEmitter.event().name("error").data("Error en el servidor"));
+                    emitter.send(SseEmitter.event()
+                            .name("error")
+                            .data("Error interno")
+                    );
                 } catch (Exception ignored) {}
             } finally {
                 heartbeat.cancel();
