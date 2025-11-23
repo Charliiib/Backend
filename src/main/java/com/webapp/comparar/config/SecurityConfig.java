@@ -62,14 +62,7 @@ public class SecurityConfig {
                 .and()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
-                // Opcional: excluir patrones específicos del security chain
-                .securityMatcher("/api/**")
-                .authorizeHttpRequests(auth -> auth
-                                .requestMatchers("/api/chatbot/**").permitAll()
-                        // ... otros matchers
-                );
-
+        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
