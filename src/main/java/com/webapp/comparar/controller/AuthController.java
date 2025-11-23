@@ -76,9 +76,22 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
         try {
+            // ✅ AGREGAR LOGS PARA DEBUG
+            System.out.println("🔍 LOGIN REQUEST RECIBIDA:");
+            System.out.println("📧 Email recibido: " + loginRequest.getEmail());
+            System.out.println("🔑 Password recibido: " + loginRequest.getPassword());
+
             // 1. Verificar que el usuario existe
             Usuario usuario = usuarioService.buscarPorEmail(loginRequest.getEmail())
-                    .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
+                    .orElseThrow(() -> {
+                        System.out.println("❌ USUARIO NO ENCONTRADO: " + loginRequest.getEmail());
+                        return new BadCredentialsException("Credenciales incorrectas");
+                    });
+
+            System.out.println("✅ USUARIO ENCONTRADO:");
+            System.out.println("   - ID: " + usuario.getIdUsuario());
+            System.out.println("   - Email en BD: " + usuario.getEmailUsuario());
+            System.out.println("   - Password hash en BD: " + usuario.getPassUsuario());
 
             // 2. Autenticar
             Authentication authentication = authenticationManager.authenticate(
@@ -87,6 +100,8 @@ public class AuthController {
                             loginRequest.getPassword()
                     )
             );
+
+            System.out.println("✅ AUTENTICACIÓN EXITOSA");
 
             // 3. Generar token
             String jwt = jwtTokenProvider.generateToken(authentication);
@@ -103,8 +118,11 @@ public class AuthController {
             ));
 
         } catch (BadCredentialsException e) {
+            System.out.println("❌ BAD CREDENTIALS EXCEPTION: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales incorrectas");
         } catch (Exception e) {
+            System.out.println("❌ ERROR GENERAL: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error durante la autenticación: " + e.getMessage());
         }
