@@ -6,7 +6,7 @@ import java.util.Date;
 import java.util.Objects;
 
 @Entity
-@Table(name = "productosprecio")
+@Table(name = "productosmaximos")
 @IdClass(ProductoPrecioId.class)
 public class ProductoPrecio {
 

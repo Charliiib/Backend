@@ -1,6 +1,5 @@
 package com.webapp.comparar.security;
 
-import com.webapp.comparar.config.AppConfig;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -15,21 +14,15 @@ public class JwtTokenProvider {
 
     private final SecretKey jwtSecret;
     private final int jwtExpirationInMs;
-    private final AppConfig appConfig;
 
-    // CAMBIO: Usar AppConfig en lugar de @Value
-    public JwtTokenProvider(AppConfig appConfig) {
-        this.appConfig = appConfig;
-
-        // Obtener valores desde AppConfig
-        String secret = appConfig.getJwtSecret();
-        int expiration = appConfig.getJwtExpirationMs();
+    public JwtTokenProvider(
+            @Value("${app.jwtSecret}") String secret,
+            @Value("${app.jwtExpirationInMs}") int expiration) {
 
         // Convierte la clave a formato seguro
         this.jwtSecret = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.jwtExpirationInMs = expiration;
     }
-
     public String generateToken(Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
 

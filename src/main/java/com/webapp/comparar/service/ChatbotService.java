@@ -2,7 +2,6 @@ package com.webapp.comparar.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.webapp.comparar.config.AppConfig;
 import com.webapp.comparar.dto.ChatbotResponse;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +21,8 @@ import java.util.Random;
 @Service
 public class ChatbotService {
 
-    private final String apiKey;
-    private final AppConfig appConfig;
+    @Value("${google.ai.api.key}")
+    private String apiKey;
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
     private final Random random = new Random();
@@ -34,10 +33,8 @@ public class ChatbotService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public ChatbotService(AppConfig appConfig, RestTemplate restTemplate) {
-        this.appConfig = appConfig;
-        this.apiKey = appConfig.getGoogleAiApiKey(); // Obtener API key desde AppConfig
-        this.restTemplate = restTemplate;
+    public ChatbotService() {
+        this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
 
@@ -312,7 +309,7 @@ public class ChatbotService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-            String urlWithKey = GEMINI_API_URL + "?key=" + this.apiKey;
+            String urlWithKey = GEMINI_API_URL + "?key=" + apiKey;
 
             ResponseEntity<String> response = restTemplate.exchange(
                     urlWithKey,
@@ -419,7 +416,7 @@ public class ChatbotService {
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-            String urlWithKey = GEMINI_API_URL + "?key=" + this.apiKey;
+            String urlWithKey = GEMINI_API_URL + "?key=" + apiKey;
 
             ResponseEntity<String> response = restTemplate.exchange(
                     urlWithKey,
@@ -485,7 +482,7 @@ public class ChatbotService {
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-            String urlWithKey = GEMINI_API_URL + "?key=" + this.apiKey;
+            String urlWithKey = GEMINI_API_URL + "?key=" + apiKey;
 
             ResponseEntity<String> response = restTemplate.exchange(
                     urlWithKey,
