@@ -17,6 +17,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
@@ -35,40 +37,45 @@ public class ChatbotController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             HttpServletResponse response) {
 
-        System.out.println("🎯 CHATBOT CONSULTA-STREAM ACCEDIDO - Mensaje: " + mensaje);
+        System.out.println("🎯 CHATBOT STREAM INICIADO - mensaje: " + mensaje);
 
+        // Necesario para SSE en Railway
         response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
         response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Content-Type", "text/event-stream");
 
+        // Timeout grande
         SseEmitter emitter = new SseEmitter(0L);
 
-        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
-
-        // 🔥 THREAD PARA EVITAR DESCONEXIÓN DE RAILWAY
-        Runnable keepAlive = () -> {
-            try {
-                while (true) {
-                    Thread.sleep(1000);
-
+        // HEARTBEAT para que Railway NO mate la conexión
+        Timer heartbeat = new Timer(true);
+        heartbeat.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                try {
                     emitter.send(SseEmitter.event()
-                            .name("keepalive")
-                            .data("💓"));
-
+                            .name("ping")
+                            .data("💓")
+                    );
+                } catch (Exception e) {
+                    heartbeat.cancel();
                 }
-            } catch (Exception ignored) {
             }
-        };
+        }, 0, 800); // cada 800ms mantener la conexión viva
 
-        Thread keepAliveThread = new Thread(keepAlive);
-        keepAliveThread.start();
+        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
         CompletableFuture.runAsync(() -> {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                emitter.completeWithError(e);
+                try {
+                    emitter.send(SseEmitter.event().name("error").data("Error en el servidor"));
+                } catch (Exception ignored) {}
             } finally {
-                keepAliveThread.interrupt(); // 🔥 PARAMOS EL HILO KEEPALIVE
+                heartbeat.cancel();
+                emitter.complete();
             }
         });
 
