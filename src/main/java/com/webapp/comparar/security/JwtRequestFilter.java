@@ -30,7 +30,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
 
-        // ✅ IGNORAR COMPLETAMENTE ENDPOINTS PÚBLICOS
         boolean shouldNotFilter = path.startsWith("/api/auth/") ||
                 path.startsWith("/api/productos/") ||
                 path.startsWith("/api/barrios/") ||
@@ -38,12 +37,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 path.startsWith("/api/sucursales/") ||
                 path.startsWith("/api/chat/") ||
                 path.startsWith("/api/debug/") ||
-                path.contains("/api/chatbot/consulta-stream");
-                path.startsWith("/api/chatbot/"); // ✅ TODOS los endpoints de chatbot
+                path.startsWith("/api/chatbot/");
 
-        System.out.println("🔍 JwtRequestFilter - shouldNotFilter: " + shouldNotFilter + " for path: " + path);
+        // ❌ COMENTA temporalmente este log
+        // System.out.println("🔍 JwtRequestFilter - shouldNotFilter: " + shouldNotFilter + " for path: " + path);
         return shouldNotFilter;
     }
+
 
 
     @Override

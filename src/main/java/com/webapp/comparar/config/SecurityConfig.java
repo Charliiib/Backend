@@ -40,7 +40,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        System.out.println("🔐 CARGANDO SECURITY CONFIG - CHATBOT CONSULTA-STREAM DEBE SER PÚBLICO");
+        // ❌ ELIMINA este log que se ejecuta en cada request
+        // System.out.println("🔐 CARGANDO SECURITY CONFIG - CHATBOT CONSULTA-STREAM DEBE SER PÚBLICO");
 
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -53,14 +54,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
-                        // ✅ ORDEN CRÍTICO CORREGIDO - primero TODOS los públicos
-                        .requestMatchers(
-                                "/api/chatbot/consulta-stream",
-                                "/api/chatbot/consulta",
-                                "/api/chatbot/solo-receta",
-                                "/api/chatbot/buscar-productos"
-                        ).permitAll()
-                        .requestMatchers("/api/chatbot/**").authenticated()
+                        // ✅ TODOS los endpoints de chatbot públicos
+                        .requestMatchers("/api/chatbot/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)

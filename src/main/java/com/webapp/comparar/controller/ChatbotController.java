@@ -32,10 +32,7 @@ public class ChatbotController {
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 CHATBOT ENDPOINT ACCEDIDO - Debería ser público");
-        System.out.println("📝 Mensaje: " + mensaje);
-        System.out.println("🔐 Auth Header presente: " + (authHeader != null));
-        System.out.println("🔐 Authentication en contexto: " + SecurityContextHolder.getContext().getAuthentication());
+        System.out.println("🎯 CHATBOT CONSULTA-STREAM ACCEDIDO - Mensaje: " + mensaje);
 
         SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
