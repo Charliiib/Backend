@@ -52,8 +52,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
+                        // ✅ ORDEN CRÍTICO CORREGIDO - primero TODOS los públicos
+                        .requestMatchers(
+                                "/api/chatbot/consulta-stream",
+                                "/api/chatbot/consulta",
+                                "/api/chatbot/solo-receta",
+                                "/api/chatbot/buscar-productos"
+                        ).permitAll()
                         .requestMatchers("/api/chatbot/**").authenticated()
                         .anyRequest().authenticated()
                 )

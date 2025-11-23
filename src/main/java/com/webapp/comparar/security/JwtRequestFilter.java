@@ -39,6 +39,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 path.startsWith("/api/chat/") ||
                 path.startsWith("/api/debug/") ||
                 path.contains("/api/chatbot/consulta-stream");
+                path.startsWith("/api/chatbot/"); // ✅ TODOS los endpoints de chatbot
 
         System.out.println("🔍 JwtRequestFilter - shouldNotFilter: " + shouldNotFilter + " for path: " + path);
         return shouldNotFilter;
