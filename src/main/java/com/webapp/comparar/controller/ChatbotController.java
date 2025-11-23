@@ -44,6 +44,15 @@ public class ChatbotController {
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
+        // 🔥 PING INICIAL para que Railway NO corte la conexión
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("ping")
+                    .data("inicio"));
+        } catch (Exception e) {
+            System.out.println("Error enviando ping inicial: " + e.getMessage());
+        }
+
         CompletableFuture.runAsync(() -> {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
@@ -54,6 +63,7 @@ public class ChatbotController {
 
         return emitter;
     }
+
     @PostMapping("/consulta")
     public ResponseEntity<ChatbotResponse> consultarRecetaConProductos(
             @RequestBody ChatbotRequest request,
