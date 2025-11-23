@@ -54,9 +54,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
-                        // ✅ TODOS los endpoints de chatbot públicos
                         .requestMatchers("/api/chatbot/**").permitAll()
                         .anyRequest().authenticated()
+                )
+                .headers(headers -> headers
+                        .contentTypeOptions(contentType -> contentType.disable())
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()
@@ -71,7 +73,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList(
+        configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "https://frontend-pi-jet-42.vercel.app",
                 "https://frontend-cdfgwkdfp-chartie-projects-6b04c52b.vercel.app",
@@ -90,7 +92,8 @@ public class SecurityConfig {
         ));
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
-                "Content-Disposition"
+                "Content-Disposition",
+                "Content-Type"
         ));
         configuration.setAllowCredentials(true); // IMPORTANTE: cambiar a true
         configuration.setMaxAge(3600L); // Cache preflight por 1 hora
