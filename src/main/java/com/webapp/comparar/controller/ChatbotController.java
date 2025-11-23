@@ -6,11 +6,14 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -29,25 +32,28 @@ public class ChatbotController {
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            HttpServletResponse response) {
 
         System.out.println("🎯 CHATBOT CONSULTA-STREAM ACCEDIDO - Mensaje: " + mensaje);
 
-        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
+
+        SseEmitter emitter = new SseEmitter(0L);
+
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
         CompletableFuture.runAsync(() -> {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                System.err.println("❌ Error en controller streaming: " + e.getMessage());
                 emitter.completeWithError(e);
             }
         });
 
         return emitter;
     }
-
     @PostMapping("/consulta")
     public ResponseEntity<ChatbotResponse> consultarRecetaConProductos(
             @RequestBody ChatbotRequest request,
