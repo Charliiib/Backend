@@ -27,20 +27,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-
-        // ✅ IGNORAR COMPLETAMENTE LOS ENDPOINTS PÚBLICOS
-        return path.startsWith("/api/auth/") ||
-                path.startsWith("/api/productos/") ||
-                path.startsWith("/api/barrios/") ||
-                path.startsWith("/api/comercios/") ||
-                path.startsWith("/api/sucursales/") ||
-                path.startsWith("/api/chat/") ||
-                path.startsWith("/api/chatbot/consulta-stream");
-    }
-
-    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
@@ -54,13 +40,14 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
             // Usar JwtTokenProvider en lugar de JwtTokenUtil
             if (jwtTokenProvider.validateToken(jwt)) {
-                username = jwtTokenProvider.getUsernameFromJWT(jwt);
+                username = jwtTokenProvider.getUsernameFromJWT(jwt); // Necesitamos agregar este método
             }
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
 
+            // Ya validamos el token arriba, así que podemos proceder
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
