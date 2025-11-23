@@ -33,3 +33,4 @@ build/
 .vscode/
 # Spring Boot
 application-secret.properties
+application.properties
