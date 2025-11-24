@@ -40,9 +40,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println("🔐 CARGANDO SECURITY CONFIG - CHATBOT CONSULTA-STREAM DEBE SER PÚBLICO");
+
         http
-                .cors().configurationSource(corsConfigurationSource()).and()
-                .csrf().disable()
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/productos/**").permitAll()
@@ -50,9 +52,16 @@ public class SecurityConfig {
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
+                        .requestMatchers("/api/debug/**").permitAll()
+                        // ✅ ORDEN CRÍTICO CORREGIDO - primero TODOS los públicos
+                        .requestMatchers(
+                                "/api/chatbot/consulta-stream",
+                                "/api/chatbot/consulta",
+                                "/api/chatbot/solo-receta",
+                                "/api/chatbot/buscar-productos"
+                        ).permitAll()
                         .requestMatchers("/api/chatbot/**").authenticated()
-                        .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
+                        .anyRequest().authenticated()
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()
@@ -67,10 +76,28 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));  // O especifica tus dominios
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:3000",
+                "https://frontend-pi-jet-42.vercel.app",
+                "https://frontend-cdfgwkdfp-chartie-projects-6b04c52b.vercel.app",
+                "https://*.vercel.app"
+        ));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Disposition"
+        ));
+        configuration.setAllowCredentials(true); // IMPORTANTE: cambiar a true
+        configuration.setMaxAge(3600L); // Cache preflight por 1 hora
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
