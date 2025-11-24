@@ -1,17 +1,16 @@
 package com.webapp.comparar.security;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
+import com.webapp.comparar.service.JwtUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import com.webapp.comparar.service.JwtUserDetailsService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
@@ -30,29 +29,49 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        String method = request.getMethod();
 
-        // ✅ IGNORAR COMPLETAMENTE TODAS LAS RUTAS DE CHATBOT
-        if (path.startsWith("/api/chatbot")) {
-            System.out.println("🔒 JWT FILTER SKIPPED - Chatbot route: " + path);
+        // 🔥 BLOQUE NUCLEAR: IGNORAR COMPLETAMENTE TODO EL CHATBOT
+        System.out.println("🚨 JWT FILTER CHECK: " + method + " " + path);
+
+        if (path.contains("/api/chatbot") || path.startsWith("/api/chatbot")) {
+            System.out.println("🛑 JWT FILTER BYPASSED - Chatbot route detected!");
             return true; // COMPLETAMENTE IGNORAR
         }
 
         // Otras rutas públicas
-        return path.startsWith("/api/auth/")
+        boolean shouldSkip = path.startsWith("/api/auth/")
                 || path.startsWith("/api/productos/")
                 || path.startsWith("/api/barrios/")
                 || path.startsWith("/api/comercios/")
                 || path.startsWith("/api/sucursales/")
                 || path.startsWith("/api/chat/")
                 || path.startsWith("/api/debug/");
+
+        if (shouldSkip) {
+            System.out.println("🛑 JWT FILTER BYPASSED - Public route: " + path);
+        } else {
+            System.out.println("✅ JWT FILTER WILL APPLY - Private route: " + path);
+        }
+
+        return shouldSkip;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        // 🔍 Este método SOLO se ejecuta para rutas PRIVADAS
-        System.out.println("🔍 JWT FILTER APPLIED to: " + request.getRequestURI());
+        // 🔍 VERIFICACIÓN ADICIONAL
+        String path = request.getRequestURI();
+        if (path.contains("/api/chatbot") || path.startsWith("/api/chatbot")) {
+            System.out.println("🚨 URGENT: Chatbot route leaked through filter!");
+            // Force bypass even if previous check failed
+            chain.doFilter(request, response);
+            return;
+        }
+
+        // ✅ Este método SOLO para rutas PRIVADAS
+        System.out.println("🔐 JWT FILTER EXECUTING for: " + path);
 
         final String authorizationHeader = request.getHeader("Authorization");
 
@@ -68,18 +87,23 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 }
             } catch (Exception e) {
                 System.out.println("❌ JWT validation failed: " + e.getMessage());
+                // No lanzar excepción, simplemente continuar sin auth
             }
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
+            try {
+                UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
 
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                    userDetails, null, userDetails.getAuthorities());
-            authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            System.out.println("🔐 Authentication set for user: " + username);
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                System.out.println("🔐 Authentication set for user: " + username);
+            } catch (Exception e) {
+                System.out.println("❌ Failed to load user details: " + e.getMessage());
+            }
         }
 
         chain.doFilter(request, response);
