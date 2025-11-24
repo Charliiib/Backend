@@ -19,6 +19,8 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping("/api/chatbot")
 @CrossOrigin(origins = {
         "https://frontend-pi-jet-42.vercel.app",
+        "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app/",
+        "https://frontend-jh3615d14-charlis-projects-6b04c52b.vercel.app/",
         "https://tu-frontend.vercel.app",
         "http://localhost:3000"
 }, maxAge = 3600)

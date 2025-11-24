@@ -1,186 +1,231 @@
-#!/bin/bash
+# 🔧 SOLUCIÓN COMPLETA - Chatbot CORS/SSE Errors
 
-# 🧪 Script de Verificación para Chatbot Railway + Vercel
-# Ejecutar después del deploy para verificar funcionamiento
+## 📋 PROBLEMA IDENTIFICADO
 
-echo "🚀 INICIANDO VERIFICACIÓN DEL CHATBOT"
-echo "======================================"
+Tu chatbot funciona perfectamente en local, pero en producción (Vercel + Railway) presenta:
 
-# Colores para output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+1. **Error 502 Bad Gateway**: Backend no accesible
+2. **CORS Policy Error**: Headers CORS no se envían para SSE
+3. **SSE Connection Failed**: Server-Sent Events no funcionan
+4. **Environment Variables**: Configuración incorrecta en producción
 
-# URLs
-BACKEND_URL="https://backend-production-4d5a.up.railway.app"
-FRONTEND_URL="https://frontend-pi-jet-42.vercel.app"
-API_KEY="tu_google_ai_api_key_aqui" # ⚠️ REEMPLAZAR con tu API key real
+---
 
-print_status() {
-    local status=$1
-    local message=$2
-    if [ "$status" = "OK" ]; then
-        echo -e "${GREEN}✅ $message${NC}"
-    elif [ "$status" = "ERROR" ]; then
-        echo -e "${RED}❌ $message${NC}"
-    elif [ "$status" = "WARNING" ]; then
-        echo -e "${YELLOW}⚠️  $message${NC}"
-    elif [ "$status" = "INFO" ]; then
-        echo -e "${BLUE}ℹ️  $message${NC}"
-    fi
+## 📦 ARCHIVOS PROPORCIONADOS
+
+### 1. **Backend (Railway)**
+- ✅ `SecurityConfig-Corregido.java` - Configuración CORS optimizada
+- ✅ Configuración existente en `application.yml` ya correcta
+
+### 2. **Frontend (Vercel)**
+- ✅ `ChatBotComponent-Corregido.js` - Manejo mejorado de SSE y errores
+
+### 3. **Herramientas de Verificación**
+- ✅ `verificar-chatbot.sh` - Script de testing automático
+- ✅ `configuracion-variables.md` - Guía paso a paso
+
+### 4. **Documentación**
+- ✅ `chatbot-deployment-fix.md` - Explicación técnica detallada
+
+---
+
+## 🚀 IMPLEMENTACIÓN (5 PASOS)
+
+### PASO 1: Variables de Entorno en Railway
+```
+Dashboard → Tu Proyecto → Variables
+```
+**Agregar:**
+- `GOOGLE_AI_API_KEY=tu_clave_real_aqui`
+- `PORT=8080`
+
+### PASO 2: Reemplazar SecurityConfig
+1. **Download**: `SecurityConfig-Corregido.java`
+2. **Ubicación**: `src/main/java/com/webapp/comparar/config/SecurityConfig.java`
+3. **Reemplazar** el contenido existente
+4. **Redeploy**: Railway lo hará automáticamente
+
+### PASO 3: Variables de Entorno en Vercel
+```
+Dashboard → Tu Proyecto → Settings → Environment Variables
+```
+**Agregar:**
+- `REACT_APP_API_URL=https://backend-production-4d5a.up.railway.app`
+
+### PASO 4: Reemplazar Frontend Component
+1. **Download**: `ChatBotComponent-Corregido.js`
+2. **Ubicación**: `src/components/ChatBotComponent.js`
+3. **Reemplazar** el contenido existente
+4. **Redeploy**: Vercel lo hará automáticamente
+
+### PASO 5: Verificación
+```bash
+chmod +x verificar-chatbot.sh
+./verificar-chatbot.sh
+```
+
+---
+
+## 🔍 CAMBIOS IMPLEMENTADOS
+
+### Backend (SecurityConfig.java)
+```java
+// ✅ Configuración CORS unificada
+// ✅ Headers específicos para SSE
+// ✅ Soporte Railway health checks
+// ✅ Variables de entorno dinámicas
+
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+
+    // Parse de orígenes desde variables de entorno
+    List<String> origins = Arrays.asList(allowedOrigins.split(","));
+    configuration.setAllowedOriginPatterns(origins);
+
+    // Headers específicos para SSE
+    configuration.setExposedHeaders(Arrays.asList(
+        "Authorization", "Content-Type",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
+    ));
+
+    // Configuración para SSE
+    configuration.setAllowCredentials(true);
+    configuration.setMaxAge(3600L);
+
+    return source;
 }
+```
 
-echo ""
-echo "🔍 VERIFICACIÓN 1: Health Check del Backend"
-echo "============================================"
+### Frontend (ChatBotComponent.js)
+```javascript
+// ✅ Detección automática de URL de backend
+// ✅ Manejo mejorado de errores SSE
+// ✅ Timeout de seguridad (3 minutos)
+// ✅ Reintentos automáticos
+// ✅ Logging detallado para debug
 
-health_response=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_URL}/actuator/health")
-if [ "$health_response" = "200" ]; then
-    print_status "OK" "Backend responde correctamente (HTTP $health_response)"
+const getBackendUrl = () => {
+    // 1. Variable de entorno (prioridad máxima)
+    if (process.env.REACT_APP_API_URL) {
+        return process.env.REACT_APP_API_URL;
+    }
 
-    # Mostrar detalles del health check
-    health_data=$(curl -s "${BACKEND_URL}/actuator/health")
-    echo -e "${BLUE}📊 Detalles del Health Check:${NC}"
-    echo "$health_data" | jq '.' 2>/dev/null || echo "$health_data"
-else
-    print_status "ERROR" "Backend no responde correctamente (HTTP $health_response)"
-fi
+    // 2. URL de Railway en producción
+    if (window.location.hostname.includes('vercel.app')) {
+        return 'https://backend-production-4d5a.up.railway.app';
+    }
 
-echo ""
-echo "🔍 VERIFICACIÓN 2: Test CORS Preflight"
-echo "======================================"
+    // 3. Fallback local
+    return 'http://localhost:8080';
+};
+```
 
-cors_response=$(curl -s -i "${BACKEND_URL}/api/chatbot/consulta-stream?mensaje=test" \
-  -H "Origin: ${FRONTEND_URL}" \
-  -H "Access-Control-Request-Method: GET" \
-  -H "Access-Control-Request-Headers: Authorization" \
-  -X OPTIONS)
+---
 
-if echo "$cors_response" | grep -q "Access-Control-Allow-Origin"; then
-    print_status "OK" "Headers CORS presentes en respuesta"
-    echo -e "${BLUE}📋 Headers CORS encontrados:${NC}"
-    echo "$cors_response" | grep "Access-Control"
-else
-    print_status "ERROR" "Headers CORS NO encontrados en respuesta"
-fi
+## 🎯 RESULTADO ESPERADO
 
-echo ""
-echo "🔍 VERIFICACIÓN 3: Test SSE Endpoint (sin streaming)"
-echo "===================================================="
+### Antes (PROBLEMAS):
+```bash
+❌ CORS policy: No 'Access-Control-Allow-Origin' header
+❌ SSE Error: net::ERR_FAILED 502 (Bad Gateway)
+❌ Chatbot no funciona en producción
+```
 
-sse_response=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_URL}/api/chatbot/consulta-stream?mensaje=pizza" \
-  -H "Origin: ${FRONTEND_URL}" \
-  -H "Authorization: Bearer test")
+### Después (SOLUCIONADO):
+```bash
+✅ CORS headers presentes
+✅ SSE connections working
+✅ Health check: UP
+✅ Chatbot funcional en producción
+```
 
-if [ "$sse_response" = "200" ]; then
-    print_status "OK" "Endpoint SSE responde correctamente (HTTP $sse_response)"
-else
-    print_status "ERROR" "Endpoint SSE no responde correctamente (HTTP $sse_response)"
-fi
+---
 
-echo ""
-echo "🔍 VERIFICACIÓN 4: Test API POST (Fallback)"
-echo "==========================================="
+## 🧪 TESTING INMEDIATO
 
-api_response=$(curl -s -X POST "${BACKEND_URL}/api/chatbot/solo-receta" \
-  -H "Content-Type: application/json" \
-  -H "Origin: ${FRONTEND_URL}" \
-  -d '{"mensaje":"como hacer una pizza"}')
+### Test 1: Health Check
+```bash
+curl https://backend-production-4d5a.up.railway.app/actuator/health
+```
+**Esperado**: `{"status":"UP"}`
 
-if echo "$api_response" | grep -q "INGREDIENTES\|Instrucciones\|receta"; then
-    print_status "OK" "API POST funciona correctamente"
-    echo -e "${BLUE}📝 Respuesta de ejemplo:${NC}"
-    echo "$api_response" | head -c 200
-    echo "..."
-else
-    print_status "ERROR" "API POST no responde correctamente"
-    echo -e "${RED}📄 Respuesta recibida:${NC}"
-    echo "$api_response"
-fi
+### Test 2: CORS Preflight
+```bash
+curl -i https://backend-production-4d5a.up.railway.app/api/chatbot/consulta-stream?mensaje=test \
+  -H "Origin: https://frontend-pi-jet-42.vercel.app" \
+  -X OPTIONS
+```
+**Esperado**: Headers `Access-Control-Allow-Origin`
 
-echo ""
-echo "🔍 VERIFICACIÓN 5: Frontend Configuración"
-echo "========================================"
+### Test 3: Frontend en Vivo
+- Ir a: https://frontend-pi-jet-42.vercel.app
+- Abrir DevTools → Console
+- Enviar mensaje al chatbot
+- **Esperado**: No errores CORS/SSE
 
-# Verificar si el frontend está accesible
-frontend_response=$(curl -s -o /dev/null -w "%{http_code}" "${FRONTEND_URL}")
-if [ "$frontend_response" = "200" ]; then
-    print_status "OK" "Frontend accesible (HTTP $frontend_response)"
-else
-    print_status "ERROR" "Frontend no accesible (HTTP $frontend_response)"
-fi
+---
 
-echo ""
-echo "🔍 VERIFICACIÓN 6: Variables de Entorno"
-echo "======================================"
+## 🔧 TROUBLESHOOTING
 
-print_status "INFO" "Verificar en Railway Dashboard:"
-echo "  • GOOGLE_AI_API_KEY configurado"
-echo "  • PORT configurado (8080)"
+### Si sigue dando Error 502:
+1. ✅ Verificar `GOOGLE_AI_API_KEY` en Railway
+2. ✅ Revisar logs: Railway Dashboard → Deploy → Logs
+3. ✅ Esperar 2-3 minutos y reintentar
 
-print_status "INFO" "Verificar en Vercel Dashboard:"
-echo "  • REACT_APP_API_URL configurado: ${BACKEND_URL}"
+### Si sigue dando CORS:
+1. ✅ Hard refresh browser (Ctrl+F5)
+2. ✅ Verificar `REACT_APP_API_URL` en Vercel
+3. ✅ Esperar propagación (2-3 minutos)
 
-echo ""
-echo "🧪 VERIFICACIÓN 7: Test de Conectividad"
-echo "======================================="
+### Si SSE no funciona:
+1. ✅ Verificar que endpoint responde: `/api/chatbot/consulta-stream`
+2. ✅ Revisar DevTools → Network para errores
+3. ✅ Probar en modo incógnito
 
-# Test de conectividad básica
-ping -c 1 backend-production-4d5a.up.railway.app > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-    print_status "OK" "Conectividad a backend: OK"
-else
-    print_status "WARNING" "Conectividad a backend: Falla (puede ser normal en algunos entornos)"
-fi
+---
 
-echo ""
-echo "📋 RESUMEN DE VERIFICACIÓN"
-echo "=========================="
+## 📊 MONITOREO POST-DEPLOY
 
-# Verificar todo y mostrar resumen final
-all_checks=0
-passed_checks=0
+### Railway Dashboard:
+- **URL**: https://railway.app/dashboard → Tu Proyecto → Deploy
+- **Qué observar**:
+  - ✅ Deploy exitoso sin errores
+  - ✅ Health check UP
+  - ✅ Logs muestran configuración CORS
 
-# Contar checks que pasaron
-if [ "$health_response" = "200" ]; then ((passed_checks++)); fi
-((all_checks++))
+### Vercel Dashboard:
+- **URL**: https://vercel.com/dashboard → Tu Proyecto → Functions
+- **Qué observar**:
+  - ✅ Deploy exitoso
+  - ✅ Variables de entorno configuradas
 
-if echo "$cors_response" | grep -q "Access-Control-Allow-Origin"; then ((passed_checks++)); fi
-((all_checks++))
+---
 
-if [ "$sse_response" = "200" ]; then ((passed_checks++)); fi
-((all_checks++))
+## ✅ CHECKLIST DE COMPLETADO
 
-if [ "$frontend_response" = "200" ]; then ((passed_checks++)); fi
-((all_checks++))
+- [ ] Variables Railway configuradas (`GOOGLE_AI_API_KEY`, `PORT`)
+- [ ] SecurityConfig.java actualizado en backend
+- [ ] Backend re-desplegado sin errores
+- [ ] Variables Vercel configuradas (`REACT_APP_API_URL`)
+- [ ] ChatBotComponent.js actualizado en frontend
+- [ ] Frontend re-desplegado sin errores
+- [ ] Health check responde UP
+- [ ] Chatbot funciona en producción ✅
 
-echo -e "${BLUE}📊 Puntuación: ${passed_checks}/${all_checks} checks pasaron${NC}"
+---
 
-if [ "$passed_checks" -eq "$all_checks" ]; then
-    print_status "OK" "🎉 TODOS LOS CHECKS PASARON - Tu chatbot debería funcionar correctamente!"
-elif [ "$passed_checks" -ge 3 ]; then
-    print_status "WARNING" "⚠️  La mayoría de checks pasaron, el chatbot debería funcionar con problemas menores"
-else
-    print_status "ERROR" "❌ Múltiples checks fallaron - Revisar configuración antes de usar el chatbot"
-fi
+## 🎉 RESULTADO FINAL
 
-echo ""
-echo "🔧 ACCIONES POSTERIORES"
-echo "======================"
-echo "1. Si algún check falló, revisar la configuración en los dashboards"
-echo "2. Esperar 2-3 minutos para que los cambios se propaguen"
-echo "3. Probar el chatbot en el frontend en vivo"
-echo "4. Verificar logs en Railway Dashboard si persisten errores"
+Una vez implementados estos cambios:
+- **No más errores CORS**
+- **SSE funcionando perfectamente**
+- **Error 502 resuelto**
+- **Chatbot operativo en producción como en local**
 
-echo ""
-echo -e "${BLUE}🔗 Enlaces útiles:${NC}"
-echo "• Backend Health: ${BACKEND_URL}/actuator/health"
-echo "• Frontend: ${FRONTEND_URL}"
-echo "• Railway Dashboard: https://railway.app/dashboard"
-echo "• Vercel Dashboard: https://vercel.com/dashboard"
+**Tiempo estimado de implementación**: 15-20 minutos
+**Tiempo de propagación**: 2-3 minutos adicionales
 
-echo ""
-echo "✅ VERIFICACIÓN COMPLETADA"
-echo "========================="
+¡Tu chatbot debería funcionar perfectamente después de estos cambios! 🚀

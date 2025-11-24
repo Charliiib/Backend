@@ -78,7 +78,7 @@ public class SecurityConfig {
 
         // Parse origins from environment variable
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOriginPatterns(origins);
+        configuration.setAllowedOrigins(origins);
 
         // Métodos permitidos (incluye OPTIONS para preflight)
         configuration.setAllowedMethods(Arrays.asList(
@@ -100,7 +100,8 @@ public class SecurityConfig {
                 "X-Key",
                 "Access-Control-Allow-Origin",
                 "Access-Control-Allow-Methods",
-                "Access-Control-Allow-Headers"
+                "Access-Control-Allow-Headers",
+                "Last-Event-ID"
         ));
 
         // Headers expuestos (importante para SSE)
@@ -113,7 +114,8 @@ public class SecurityConfig {
                 "Cache-Control",
                 "Content-Encoding",
                 "Last-Modified",
-                "ETag"
+                "ETag",
+                "Last-Event-ID"
         ));
 
         // Configuración específica para SSE
