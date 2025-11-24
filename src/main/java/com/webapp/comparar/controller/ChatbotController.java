@@ -6,7 +6,6 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +34,7 @@ public class ChatbotController {
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            HttpServletResponse response) { // 🔥 AGREGAR HttpServletResponse
+            HttpServletResponse response) {
 
         System.out.println("🎯 SOLUCIÓN RAILWAY: Solicitud recibida -> " + mensaje);
 
@@ -47,10 +46,10 @@ public class ChatbotController {
         response.setHeader("Access-Control-Max-Age", "3600");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
-        response.setHeader("X-Accel-Buffering", "no"); // 🔥 IMPORTANTE para Nginx/Railway
+        response.setHeader("X-Accel-Buffering", "no"); // 🔥 CRÍTICO para Nginx/Railway
 
-        // ⬅️ TIMEOUT EXTENDIDO para Railway
-        SseEmitter emitter = new SseEmitter(180000L); // 3 minutos máximo
+        // ⬅️ TIMEOUT EXTENDIDO para Railway (coincide con tu YML)
+        SseEmitter emitter = new SseEmitter(180000L); // 3 minutos
 
         // 🔥 CONFIGURACIÓN MEJORADA RAILWAY
         emitter.onCompletion(() -> {
@@ -111,14 +110,49 @@ public class ChatbotController {
         return emitter;
     }
 
-    // 🔥 AGREGAR ENDPOINT DE HEALTH CHECK para Railway
+    // 🔥 ENDPOINT DE HEALTH CHECK ESPECÍFICO para Railway
     @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> healthCheck() {
-        Map<String, String> response = new HashMap<>();
+    public ResponseEntity<Map<String, Object>> healthCheck() {
+        Map<String, Object> response = new HashMap<>();
         response.put("status", "OK");
-        response.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        response.put("timestamp", System.currentTimeMillis());
         response.put("service", "chatbot-streaming");
+        response.put("environment", "railway");
+        response.put("version", "1.0");
         return ResponseEntity.ok(response);
+    }
+
+    // 🔥 ENDPOINT DE TEST SSE SIMPLE para Railway
+    @GetMapping(value = "/test-sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter testSSE(HttpServletResponse response) {
+        // Headers CORS
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET");
+        response.setHeader("Cache-Control", "no-cache");
+
+        SseEmitter emitter = new SseEmitter(30000L);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                for (int i = 1; i <= 5; i++) {
+                    Thread.sleep(1000);
+                    Map<String, Object> event = new HashMap<>();
+                    event.put("message", "Test message " + i);
+                    event.put("timestamp", System.currentTimeMillis());
+                    event.put("type", "test");
+
+                    emitter.send(SseEmitter.event()
+                            .data(event)
+                            .id(String.valueOf(i))
+                            .name("test"));
+                }
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
     }
 
     @PostMapping("/consulta")

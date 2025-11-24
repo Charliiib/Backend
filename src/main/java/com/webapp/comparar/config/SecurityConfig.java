@@ -29,8 +29,8 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtRequestFilter jwtRequestFilter;
 
-    @Value("${cors.allowed-origins:https://frontend-pi-jet-42.vercel.app,http://localhost:3000,http://localhost:5173,http://localhost:5174}")
-    private String allowedOrigins;
+    @Value("${cors.allowed-origins:https://frontend-pi-jet-42.vercel.app,http://localhost:3000}")
+    private String[] allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
                           JwtRequestFilter jwtRequestFilter) {
@@ -57,7 +57,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/health").permitAll() // 🔥 NUEVO health check
+                        .requestMatchers("/api/chatbot/health").permitAll()
+                        .requestMatchers("/api/chatbot/test-sse").permitAll()
                         .requestMatchers("/api/chatbot/consulta-stream").permitAll()
                         .requestMatchers("/api/chatbot/**").permitAll()
                         .anyRequest().authenticated()
@@ -71,26 +72,19 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🔥 CONFIGURACIÓN CORS MEJORADA PARA RAILWAY
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Orígenes explícitos para Railway + Vercel
-        configuration.setAllowedOrigins(Arrays.asList(
-                "https://frontend-pi-jet-42.vercel.app",
-                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:5174"
-        ));
+        // 🔥 ORÍGENES DESDE TU YML
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
 
-        // 🔥 MÉTODOS PERMITIDOS (CRÍTICO para SSE)
+        // 🔥 MÉTODOS PERMITIDOS
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
         ));
 
-        // 🔥 HEADERS PERMITIDOS (ESPECÍFICO para SSE)
+        // 🔥 HEADERS PERMITIDOS (CRÍTICO para SSE)
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -101,11 +95,6 @@ public class SecurityConfig {
                 "Access-Control-Request-Headers",
                 "Cache-Control",
                 "Pragma",
-                "X-Access-Token",
-                "X-Key",
-                "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Methods",
-                "Access-Control-Allow-Headers",
                 "Last-Event-ID", // 🔥 CRÍTICO para SSE
                 "Accept-Encoding",
                 "Accept-Language"
@@ -120,10 +109,8 @@ public class SecurityConfig {
                 "Access-Control-Allow-Headers",
                 "Cache-Control",
                 "Content-Encoding",
-                "Last-Modified",
-                "ETag",
                 "Last-Event-ID", // 🔥 CRÍTICO para SSE
-                "X-Accel-Buffering" // 🔥 PARA NGINX/RAILWAY
+                "X-Accel-Buffering" // 🔥 PARA RAILWAY
         ));
 
         configuration.setAllowCredentials(true);
@@ -132,7 +119,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
 
-        System.out.println("🌍 CORS Configurado para Railway con orígenes: " + configuration.getAllowedOrigins());
+        System.out.println("🌍 CORS Configurado para Railway con orígenes: " + Arrays.toString(allowedOrigins));
         return source;
     }
 
