@@ -54,6 +54,7 @@ public class ChatbotController {
 
         return ResponseEntity.ok()
                 .headers(headers)
+                .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(emitter);
     }
 

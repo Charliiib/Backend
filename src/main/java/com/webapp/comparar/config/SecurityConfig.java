@@ -80,8 +80,8 @@ public class SecurityConfig {
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
         configuration.setAllowedOrigins(Arrays.asList(
                 "https://frontend-pi-jet-42.vercel.app",
+                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app", // Si usas ramas de preview
                 "http://localhost:3000"
-                // Agrega aquí cualquier otro dominio exacto que uses
         ));
 
         // Métodos permitidos (incluye OPTIONS para preflight)
