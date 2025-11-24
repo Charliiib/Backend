@@ -6,6 +6,7 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,8 +31,9 @@ public class ChatbotController {
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader, HttpServletResponse response) {
 
+        response.setHeader("X-Accel-Buffering", "no");
         System.out.println("🎯 CHATBOT ENDPOINT ACCEDIDO - Debería ser público");
         System.out.println("📝 Mensaje: " + mensaje);
         System.out.println("🔐 Auth Header presente: " + (authHeader != null));
