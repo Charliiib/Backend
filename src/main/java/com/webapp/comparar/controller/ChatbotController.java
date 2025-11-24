@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -38,14 +39,26 @@ public class ChatbotController {
         System.out.println("📝 Mensaje: " + mensaje);
         System.out.println("🔐 Auth Header presente: " + (authHeader != null));
         System.out.println("🔐 Authentication en contexto: " + SecurityContextHolder.getContext().getAuthentication());
-        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // 2 minutos timeout
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
+// 3. 💥 ENVIAR EL PRIMER DATO INMEDIATAMENTE 💥
+        try {
+            // Envía un evento simple o un comentario
+            emitter.send(SseEmitter.event().name("ping").data("Conexión establecida."));
+        } catch (IOException e) {
+            // Si falla aquí, la conexión ya estaba rota (Broken Pipe)
+            emitter.completeWithError(e);
+            return emitter;
+        }
+
+        // 4. Iniciar la lógica de Gemini de forma Asíncrona (la parte lenta)
         CompletableFuture.runAsync(() -> {
             try {
+                // Llama a tu servicio para obtener la respuesta de Gemini
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
+
             } catch (Exception e) {
-                System.err.println("❌ Error en controller streaming: " + e.getMessage());
                 emitter.completeWithError(e);
             }
         });
