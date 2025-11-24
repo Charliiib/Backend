@@ -53,9 +53,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
-
-                        // 🔥 Chatbot TOTALMENTE público (SSE necesita acceso libre)
                         .requestMatchers("/api/chatbot/**").permitAll()
+                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
 
                         .anyRequest().authenticated()
                 )
