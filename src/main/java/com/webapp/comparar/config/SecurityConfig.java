@@ -41,8 +41,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+        http
+                .cors().configurationSource(corsConfigurationSource()).and()
+                .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // Permitir preflight
                         .requestMatchers("/api/auth/**").permitAll()
@@ -51,8 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/**").permitAll() // Permitir t
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/chatbot/**").permitAll() // Permitir todo chatbot
+                        .anyRequest().permitAll()
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()
@@ -73,8 +74,8 @@ public class SecurityConfig {
                 "https://frontend-pi-jet-42.vercel.app",
                 "https://frontend-gk-let-42.vercel.app",
                 "http://localhost:3000",
-                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app",
-                "https://frontend-80f137cyy-charlis-projects-6b04c52b.vercel.app"
+                "http://localhost:5173",
+                "http://localhost:5174"
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
@@ -98,7 +99,7 @@ public class SecurityConfig {
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 
