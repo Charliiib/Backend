@@ -31,30 +31,43 @@ public class ChatbotController {
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 Controller recibió solicitud de streaming: " + mensaje);
+        System.out.println("🎯 Controller: Solicitud recibida -> " + mensaje);
 
-        // Aumentamos timeout a 5 minutos por si la IA tarda
+        // 1. Crear el Emitter con un timeout largo (5 minutos)
         SseEmitter emitter = new SseEmitter(300000L);
+
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
+        // 2. Ejecutar la lógica del servicio (Tu código actual de ChatbotService ya está bien)
         CompletableFuture.runAsync(() -> {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                System.err.println("❌ Error en controller streaming: " + e.getMessage());
+                System.err.println("❌ Controller: Error async: " + e.getMessage());
                 emitter.completeWithError(e);
             }
         });
 
-        // 🔥 FIX CLAVE: Headers para evitar buffering en Railway/Nginx
+        // 3. 🔥 CABECERAS DE ACERO REFORZADO 🔥
         HttpHeaders headers = new HttpHeaders();
+
+        // A. Anti-Buffering (Vital para Railway/Nginx)
         headers.set("X-Accel-Buffering", "no");
+
+        // B. Estándares SSE
+        headers.set("Content-Type", "text/event-stream");
         headers.set("Cache-Control", "no-cache");
         headers.set("Connection", "keep-alive");
 
+        // C. CORS "Hardcoded" (Para descartar problemas de SecurityConfig)
+        // Esto fuerza al navegador a aceptar la respuesta sí o sí.
+        // OJO: En producción idealmente usa tu dominio real, pero para arreglar el error usa '*'
+        headers.set("Access-Control-Allow-Origin", "*");
+        headers.set("Access-Control-Allow-Methods", "GET");
+        headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+
         return ResponseEntity.ok()
                 .headers(headers)
-                .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(emitter);
     }
 
