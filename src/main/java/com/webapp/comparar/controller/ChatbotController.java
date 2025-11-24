@@ -6,8 +6,6 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
-
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
+@CrossOrigin(origins = "*")
 public class ChatbotController {
 
     @Autowired
@@ -27,31 +26,21 @@ public class ChatbotController {
     @Autowired
     private ChatbotProductosService chatbotProductosService;
 
-    // ========================================================
-    // 🔥 SSE ENDPOINT — funcionando en Railway sin 401
-    // ========================================================
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            HttpServletResponse response) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 SSE ACCEDIDO → " + mensaje);
+        System.out.println("🎯 Controller recibió solicitud de streaming: " + mensaje);
 
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("Connection", "keep-alive");
-        response.setHeader("X-Accel-Buffering", "no");
-
-        // Importante: timeout alto para evitar desconexión Railway
-        SseEmitter emitter = new SseEmitter(1000L * 90); // 90 segundos
-
+        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
         CompletableFuture.runAsync(() -> {
             try {
-                chatbotService.streamReceta(mensaje, isAuthenticated, emitter);
+                chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                System.out.println("❌ Error SSE: " + e.getMessage());
+                System.err.println("❌ Error en controller streaming: " + e.getMessage());
                 emitter.completeWithError(e);
             }
         });
@@ -59,45 +48,69 @@ public class ChatbotController {
         return emitter;
     }
 
-    // ========================================================
     @PostMapping("/consulta")
     public ResponseEntity<ChatbotResponse> consultarRecetaConProductos(
             @RequestBody ChatbotRequest request,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
+        try {
+            boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
-        ChatbotResponse response = chatbotService.obtenerRespuestaIAPlusProductos(
-                request.getMensaje(), isAuthenticated
-        );
+            ChatbotResponse response = chatbotService.obtenerRespuestaIAPlusProductos(
+                    request.getMensaje(),
+                    isAuthenticated
+            );
 
-        return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            ChatbotResponse errorResponse = new ChatbotResponse(
+                    "Lo siento, hubo un problema al procesar tu consulta o buscar productos. Por favor, intenta de nuevo."
+            );
+            return ResponseEntity.status(500).body(errorResponse);
+        }
     }
 
-    // ========================================================
     @PostMapping("/solo-receta")
     public ResponseEntity<ChatbotResponse> consultarSoloReceta(
             @RequestBody ChatbotRequest request,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
+        try {
+            boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
-        String receta = chatbotService.generarReceta(request.getMensaje(), isAuthenticated);
+            String respuesta = chatbotService.obtenerRespuestaIA(request.getMensaje(), isAuthenticated);
 
-        return ResponseEntity.ok(new ChatbotResponse(receta));
+            ChatbotResponse response = new ChatbotResponse(respuesta);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            ChatbotResponse errorResponse = new ChatbotResponse(
+                    "Lo siento, hubo un problema al procesar tu consulta. Por favor, intenta de nuevo."
+            );
+            return ResponseEntity.status(500).body(errorResponse);
+        }
     }
 
-    // ========================================================
     @PostMapping("/buscar-productos")
     public ResponseEntity<ChatbotResponse> buscarProductosDeReceta(
-            @RequestBody BuscarProductosRequest request) {
+            @RequestBody BuscarProductosRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        if (request.getReceta() == null || request.getReceta().isBlank()) {
-            return ResponseEntity.badRequest().build();
+        try {
+            if (request.getReceta() == null || request.getReceta().trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            List<IngredienteEncontrado> productos = chatbotProductosService.buscarProductosPorReceta(request.getReceta());
+
+            return ResponseEntity.ok(new ChatbotResponse("", productos));
+
+        } catch (Exception e) {
+            ChatbotResponse errorResponse = new ChatbotResponse(
+                    "Lo siento, hubo un problema al buscar productos."
+            );
+            return ResponseEntity.status(500).body(errorResponse);
         }
-
-        List<IngredienteEncontrado> productos = chatbotProductosService.buscarProductosPorReceta(request.getReceta());
-
-        return ResponseEntity.ok(new ChatbotResponse("", productos));
     }
 }
