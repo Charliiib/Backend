@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.concurrent.CompletableFuture;
-
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -23,7 +25,7 @@ import java.util.Random;
 @Service
 public class ChatbotService {
 
-    @Value("${google_ai_api_key}")
+    @Value("${google.ai.api.key}")
     private String apiKey;
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
@@ -41,74 +43,94 @@ public class ChatbotService {
     }
 
     public void obtenerRespuestaConStreaming(String mensajeUsuario, boolean isAuthenticated, SseEmitter emitter) {
+        AtomicBoolean isClientConnected = new AtomicBoolean(true);
+        CompletableFuture<Void> heartbeatFuture = null;
+
         try {
-            System.out.println("🚀 INICIANDO STREAMING (con Heartbeat) para: " + mensajeUsuario);
+            System.out.println("🚀 INICIANDO STREAMING (con Heartbeat ULTRA RÁPIDO) para: " + mensajeUsuario);
 
-            // 1. Enviar evento de inicio inmediato para abrir el canal
-            Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Analizando tu consulta...");
-            inicioEvent.put("type", "inicio");
-            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
+            // 1. Heartbeat INMEDIATO y MUCHO MÁS RÁPIDO
+            heartbeatFuture = CompletableFuture.runAsync(() -> {
+                String[] frasesEspera = {
+                        "🤖 Conectando con chef virtual...",
+                        "👨‍🍳 Buscando ingredientes ideales...",
+                        "🔥 Precalentando el horno virtual...",
+                        "📖 Consultando recetas secretas...",
+                        "🔪 Cortando y preparando...",
+                        "🧂 Sazonando con IA...",
+                        "⏰ Calculando tiempos...",
+                        "🍕 Armando tu receta..."
+                };
 
-            // 2. Ejecutar la llamada a la IA en un HILO SEPARADO (Asíncrono)
-            CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return generarRecetaConIA(mensajeUsuario, isAuthenticated);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                int contador = 0;
+                while (isClientConnected.get() && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        Thread.sleep(300); // ⬅️ SOLUCIÓN: 300ms ENTRE HEARTBEATS
+
+                        String mensajeActual = frasesEspera[contador % frasesEspera.length];
+                        Map<String, Object> keepAliveEvent = new HashMap<>();
+                        keepAliveEvent.put("data", mensajeActual);
+                        keepAliveEvent.put("type", "heartbeat");
+
+                        try {
+                            emitter.send(SseEmitter.event().name("heartbeat").data(keepAliveEvent));
+                            System.out.println("💓 Heartbeat ultra-rápido: " + mensajeActual);
+                        } catch (Exception e) {
+                            System.err.println("❌ Cliente desconectado - deteniendo heartbeat");
+                            isClientConnected.set(false);
+                            break;
+                        }
+
+                        contador++;
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             });
 
-            // 3. BUCLE DE ESPERA ACTIVA (Heartbeat) - Ahora cada 1 segundo
-            String[] frasesEspera = {
-                    "👨‍🍳 Buscando los mejores ingredientes...",
-                    "🔥 Calentando los fogones...",
-                    "📖 Consultando el libro de recetas...",
-                    "🔪 Preparando las instrucciones...",
-                    "🧂 Ajustando la sazón...",
-                    "🤖 Escribiendo tu respuesta..."
-            };
+            // 2. Enviar evento de inicio DESPUÉS de iniciar heartbeat
+            Map<String, Object> inicioEvent = new HashMap<>();
+            inicioEvent.put("data", "🎯 Analizando: \"" + mensajeUsuario + "\"");
+            inicioEvent.put("type", "inicio");
+            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
 
-            int contador = 0;
-
-            // Mientras la IA no haya terminado...
-            while (!futureReceta.isDone()) {
-                // Esperamos 1 segundo
+            // 3. Ejecutar IA con TIMEOUT CORTO
+            CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
                 try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
+                    System.out.println("🧠 Llamando a Gemini API...");
+                    String resultado = generarRecetaConIA(mensajeUsuario, isAuthenticated);
+                    isClientConnected.set(false); // Detener heartbeat cuando termine
+                    return resultado;
+                } catch (Exception e) {
+                    isClientConnected.set(false);
+                    throw new RuntimeException("Error en IA: " + e.getMessage());
                 }
+            });
 
-                // Si todavía sigue pensando, enviamos un mensaje para mantener vivo el socket
-                if (!futureReceta.isDone()) {
-                    String mensajeActual = frasesEspera[contador % frasesEspera.length];
-
-                    Map<String, Object> keepAliveEvent = new HashMap<>();
-                    keepAliveEvent.put("data", mensajeActual);
-                    keepAliveEvent.put("type", "inicio");
-
-                    try {
-                        emitter.send(SseEmitter.event().name("inicio").data(keepAliveEvent));
-                        System.out.println("💓 Heartbeat enviado: " + mensajeActual);
-                    } catch (Exception e) {
-                        System.err.println("❌ Cliente desconectado durante la espera. Cancelando IA.");
-                        futureReceta.cancel(true);
-                        return;
-                    }
-                    contador++;
-                }
-            }
-
-            // 4. Obtener el resultado final
+            // 4. Esperar con timeout de 25 segundos
             String recetaCompleta;
             try {
-                recetaCompleta = futureReceta.get(); // Ya está lista, retorna inmediato
+                recetaCompleta = futureReceta.get(25, TimeUnit.SECONDS);
+                if (heartbeatFuture != null) {
+                    heartbeatFuture.cancel(true); // Cancelar heartbeat
+                }
+            } catch (TimeoutException e) {
+                isClientConnected.set(false);
+                if (heartbeatFuture != null) {
+                    heartbeatFuture.cancel(true);
+                }
+                throw new RuntimeException("⏰ Timeout: Gemini tardó más de 25 segundos");
             } catch (Exception e) {
-                throw new RuntimeException("Error al obtener respuesta de IA", e);
+                isClientConnected.set(false);
+                if (heartbeatFuture != null) {
+                    heartbeatFuture.cancel(true);
+                }
+                throw new RuntimeException("Error al obtener respuesta: " + e.getMessage());
             }
 
-            // --- A PARTIR DE AQUÍ ES TU LÓGICA ORIGINAL DE FRAGMENTACIÓN ---
+            // 5. Si llegamos aquí, enviar la receta completa
+            System.out.println("✅ Receta obtenida, enviando al cliente...");
 
             if (recetaCompleta.contains("Lo sentimos, estamos experimentando una alta demanda")) {
                 throw new RuntimeException("Service unavailable");
@@ -183,15 +205,24 @@ public class ChatbotService {
 
         } catch (Exception e) {
             System.err.println("❌ Error global en streaming: " + e.getMessage());
+            isClientConnected.set(false);
+            if (heartbeatFuture != null) {
+                heartbeatFuture.cancel(true);
+            }
+
             try {
-                // Intentar enviar error al cliente si el tubo no está roto
                 Map<String, Object> errorEvent = new HashMap<>();
-                errorEvent.put("data", "❌ Error: " + e.getMessage());
-                errorEvent.put("type", "service_error");
-                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
+                errorEvent.put("data", "⚠️ " + e.getMessage());
+                errorEvent.put("type", "error");
+                emitter.send(SseEmitter.event().name("error").data(errorEvent));
                 emitter.complete();
             } catch (Exception ex) {
-                // Si falla aquí es que ya no hay conexión, no hacemos nada
+                // Si falla aquí es que ya no hay conexión
+                try {
+                    emitter.complete();
+                } catch (Exception finalEx) {
+                    // Ignorar cualquier error final
+                }
             }
         }
     }
@@ -566,6 +597,4 @@ public class ChatbotService {
 
         return prompt.toString();
     }
-
-
 }

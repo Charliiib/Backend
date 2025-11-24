@@ -7,7 +7,6 @@ import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,54 +26,40 @@ public class ChatbotController {
     private ChatbotProductosService chatbotProductosService;
 
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<SseEmitter> consultarRecetaConStreaming(
+    public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 Controller: Solicitud recibida -> " + mensaje);
+        System.out.println("🎯 ULTRA-RÁPIDO: Solicitud recibida -> " + mensaje);
 
-        // 1. Crear el Emitter con un timeout largo (5 minutos)
-        SseEmitter emitter = new SseEmitter(600000L);
+        // ⬅️ TIMEOUT MÁS CORTO pero con heartbeat ultra-rápido
+        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos máximo
 
-        // ⬅️ AGREGAR timeout de respuesta también
+        // 🔥 CONFIGURACIÓN ANTIDESCONEXIÓN
+        emitter.onCompletion(() -> System.out.println("✅ SSE Completado"));
         emitter.onTimeout(() -> {
-            System.out.println("⏰ Timeout del emitter alcanzado");
+            System.out.println("⏰ SSE Timeout (2min)");
             emitter.complete();
         });
+        emitter.onError((e) -> System.err.println("❌ SSE Error: " + e.getMessage()));
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
-        // 2. Ejecutar la lógica del servicio (Tu código actual de ChatbotService ya está bien)
+        // EJECUTAR EN HILO SEPARADO INMEDIATAMENTE
         CompletableFuture.runAsync(() -> {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                System.err.println("❌ Controller: Error async: " + e.getMessage());
-                emitter.completeWithError(e);
+                System.err.println("❌ Error en controller async: " + e.getMessage());
+                try {
+                    emitter.completeWithError(e);
+                } catch (Exception ex) {
+                    // Ignorar si ya está completo
+                }
             }
         });
 
-        // 3. 🔥 CABECERAS DE ACERO REFORZADO 🔥
-        HttpHeaders headers = new HttpHeaders();
-
-        // A. Anti-Buffering (Vital para Railway/Nginx)
-        headers.set("X-Accel-Buffering", "no");
-
-        // B. Estándares SSE
-        headers.set("Content-Type", "text/event-stream");
-        headers.set("Cache-Control", "no-cache, no-transform");
-        headers.set("Connection", "keep-alive");
-
-        // C. CORS "Hardcoded" (Para descartar problemas de SecurityConfig)
-        // Esto fuerza al navegador a aceptar la respuesta sí o sí.
-        // OJO: En producción idealmente usa tu dominio real, pero para arreglar el error usa '*'
-        headers.set("Access-Control-Allow-Origin", "*");
-        headers.set("Access-Control-Allow-Methods", "GET");
-        headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(emitter);
+        return emitter;
     }
 
     @PostMapping("/consulta")
