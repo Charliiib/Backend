@@ -34,3 +34,5 @@ build/
 # Spring Boot
 application-secret.properties
 application.properties
+application.log
+application.log.2025-11-23.0.gz
