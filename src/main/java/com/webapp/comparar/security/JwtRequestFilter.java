@@ -31,29 +31,30 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         System.out.println("🔍 shouldNotFilter path = " + path);
 
-        // Ignorar absolutamente TODO lo que empiece por /api/chatbot
-        if (path.startsWith("/api/chatbot")) {
-            System.out.println("🟢 Ignorando JWT para chatbot");
-            return true;
-        }
-
-        // Lo demás como ya lo tenías
-        return path.startsWith("/api/auth/")
+        // ✅ RUTAS PÚBLICAS QUE NO REQUIEREN JWT
+        boolean isPublicRoute = path.startsWith("/api/chatbot")
+                || path.startsWith("/api/auth/")
                 || path.startsWith("/api/productos/")
                 || path.startsWith("/api/barrios/")
                 || path.startsWith("/api/comercios/")
                 || path.startsWith("/api/sucursales/")
                 || path.startsWith("/api/chat/")
                 || path.startsWith("/api/debug/");
-    }
 
+        if (isPublicRoute) {
+            System.out.println("🟢 IGNORANDO JWT para ruta pública: " + path);
+            return true;
+        }
+
+        return false;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
-        // ✅ LOG para ver qué requests están pasando por el filter
-        System.out.println("🔍 JwtRequestFilter PROCESANDO: " + request.getRequestURI());
+        // ✅ Este método solo se ejecuta si shouldNotFilter() devuelve false
+        System.out.println("🔍 JwtRequestFilter PROCESANDO AUTH para: " + request.getRequestURI());
 
         final String authorizationHeader = request.getHeader("Authorization");
 
@@ -66,6 +67,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 username = jwtTokenProvider.getUsernameFromJWT(jwt);
             }
         }
+
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
@@ -73,6 +75,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
         }
+
         chain.doFilter(request, response);
     }
 }
