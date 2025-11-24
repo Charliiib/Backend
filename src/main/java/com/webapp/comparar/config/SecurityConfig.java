@@ -1,19 +1,11 @@
 package com.webapp.comparar.config;
 
-import com.webapp.comparar.security.JwtAuthenticationEntryPoint;
-import com.webapp.comparar.security.JwtRequestFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,49 +17,18 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final JwtRequestFilter jwtRequestFilter;
-
-    public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                          JwtRequestFilter jwtRequestFilter) {
-        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
-        this.jwtRequestFilter = jwtRequestFilter;
-    }
-
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
                 // CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // CSRF: ignorar solo SSE
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/chatbot/consulta-stream")
-                        .disable()
-                )
+                // CSRF: disable
+                .csrf(csrf -> csrf.disable())
 
-                // AUTH: PATTERN MÁS ESPECÍFICO
+                // AUTH: TODO ES PÚBLICO (TEMPORAL)
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ CHATBOT: TODAS LAS RUTAS PÚBLICAS
-                        .requestMatchers("/api/chatbot/**").permitAll()
-
-                        // Otras rutas públicas
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/productos/**").permitAll()
-                        .requestMatchers("/api/barrios/**").permitAll()
-                        .requestMatchers("/api/comercios/**").permitAll()
-                        .requestMatchers("/api/sucursales/**").permitAll()
-                        .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/debug/**").permitAll()
-
-                        // TODAS LAS DEMÁS RUTAS REQUIEREN AUTH
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
 
                 // SESSIONLESS
@@ -77,19 +38,13 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.disable())
                         .httpStrictTransportSecurity(hsts -> hsts.disable())
-                )
-
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint));
-
-        // JWT FILTER: SOLO PARA RUTAS PRIVADAS
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
@@ -107,15 +62,7 @@ public class SecurityConfig {
                 "Authorization",
                 "Content-Type",
                 "Accept",
-                "Origin",
-                "X-Requested-With",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
-        ));
-
-        configuration.setExposedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type"
+                "Origin"
         ));
 
         configuration.setAllowCredentials(true);
@@ -125,15 +72,5 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
 
         return source;
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }
