@@ -2,7 +2,6 @@ package com.webapp.comparar.config;
 
 import com.webapp.comparar.security.JwtAuthenticationEntryPoint;
 import com.webapp.comparar.security.JwtRequestFilter;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,7 +19,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -28,9 +26,6 @@ public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtRequestFilter jwtRequestFilter;
-
-    @Value("${cors.allowed-origins:https://frontend-pi-jet-42.vercel.app,http://localhost:3000}")
-    private String[] allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
                           JwtRequestFilter jwtRequestFilter) {
@@ -49,19 +44,15 @@ public class SecurityConfig {
                 .cors().configurationSource(corsConfigurationSource()).and()
                 .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/productos/**").permitAll()
                         .requestMatchers("/api/barrios/**").permitAll()
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/health").permitAll()
-                        .requestMatchers("/api/chatbot/test-sse").permitAll()
                         .requestMatchers("/api/chatbot/consulta-stream").permitAll()
-                        .requestMatchers("/api/chatbot/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/chatbot/**").authenticated()
+                        .anyRequest().authenticated() // Solo endpoints futuros requerirán auth
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 .and()
@@ -72,52 +63,17 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Configuración CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        //  ORÍGENES ESPECÍFICOS PARA VERCEL + LOCAL
-        configuration.setAllowedOrigins(Arrays.asList(
-                "https://frontend-pi-jet-42.vercel.app",
-                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:5174"
-        ));
-
-        //  MÉTODOS PERMITIDOS
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-
-        //  HEADERS PERMITIDOS (CRÍTICO para SSE)
-        configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "Accept",
-                "Origin",
-                "X-Requested-With",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers",
-                "Cache-Control",
-                "Last-Event-ID", //  IMPORTANTE para SSE
-                "Accept-Encoding"
-        ));
-
-        //  HEADERS EXPUESTOS (CRÍTICO para SSE)
-        configuration.setExposedHeaders(Arrays.asList(
-                "Content-Type",
-                "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Methods",
-                "Cache-Control",
-                "Last-Event-ID" //  IMPORTANTE para SSE
-        ));
-
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
+        configuration.setAllowedOrigins(Arrays.asList("*"));  // O especifica tus dominios
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-
-        System.out.println("CORS Configurado para Vercel + Railway");
         return source;
     }
 
