@@ -44,13 +44,14 @@ public class ChatbotService {
         try {
             System.out.println("🚀 INICIANDO STREAMING (con Heartbeat) para: " + mensajeUsuario);
 
-            // 1. Mensaje inicial inmediato (para abrir conexión rápido)
+            // 1. Enviar evento de inicio inmediato para abrir el canal
             Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Iniciando...");
+            inicioEvent.put("data", "🤖 Analizando tu consulta...");
             inicioEvent.put("type", "inicio");
             emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
 
-            // 2. Lanzar la petición a Gemini en un hilo SEPARADO (Asíncrono)
+            // 2. Ejecutar la llamada a la IA en un HILO SEPARADO (Asíncrono)
+            // Esto permite que el hilo principal siga enviando mensajes mientras este trabaja
             CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
                 try {
                     return generarRecetaConIA(mensajeUsuario, isAuthenticated);
@@ -60,36 +61,42 @@ public class ChatbotService {
             });
 
             // 3. BUCLE DE ESPERA ACTIVA (Heartbeat)
-            // Mientras la IA piensa, enviamos mensajes al front cada 1.5 segundos
-            String[] mensajesEspera = {
+            // Frases para rotar mientras esperamos
+            String[] frasesEspera = {
+                    "👨‍🍳 Buscando los mejores ingredientes...",
                     "🔥 Calentando los fogones...",
-                    "🥕 Picando ingredientes...",
-                    "📖 Consultando el recetario...",
-                    "🤖 Generando instrucciones...",
-                    "🍳 Preparando tu respuesta..."
+                    "📖 Consultando el libro de recetas...",
+                    "🔪 Preparando las instrucciones...",
+                    "🧂 Ajustando la sazón...",
+                    "🤖 Escribiendo tu respuesta..."
             };
 
             int contador = 0;
 
-            // Loop mientras la tarea NO haya terminado
+            // Mientras la IA no haya terminado...
             while (!futureReceta.isDone()) {
-                // Dormimos un poco (1.5 segundos)
-                Thread.sleep(1500);
+                // Esperamos 1.5 segundos
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
 
-                // Si la IA tarda mucho, enviamos actualización para mantener el socket vivo
+                // Si todavía sigue pensando, enviamos un mensaje para mantener vivo el socket
                 if (!futureReceta.isDone()) {
-                    String mensajeActual = mensajesEspera[contador % mensajesEspera.length];
+                    String mensajeActual = frasesEspera[contador % frasesEspera.length];
 
                     Map<String, Object> keepAliveEvent = new HashMap<>();
-                    keepAliveEvent.put("data", "⏳ " + mensajeActual);
-                    keepAliveEvent.put("type", "inicio"); // Usamos 'inicio' para actualizar el globo de "Cargando"
+                    keepAliveEvent.put("data", mensajeActual);
+                    keepAliveEvent.put("type", "inicio"); // Usamos 'inicio' para que actualice el texto de carga en el front
 
                     try {
+                        // 🔥 ESTO ES LO QUE EVITA EL BROKEN PIPE / 502
                         emitter.send(SseEmitter.event().name("inicio").data(keepAliveEvent));
-                        System.out.println("💓 Keep-alive enviado: " + mensajeActual);
-                    } catch (IOException e) {
-                        // Si el cliente cerró la conexión, cancelamos la IA y salimos
-                        System.err.println("❌ Cliente desconectado durante espera: " + e.getMessage());
+                        System.out.println("💓 Heartbeat enviado: " + mensajeActual);
+                    } catch (Exception e) {
+                        // Si falla el envío aquí, es que el cliente se fue de verdad. Cancelamos todo.
+                        System.err.println("❌ Cliente desconectado durante la espera. Cancelando IA.");
                         futureReceta.cancel(true);
                         return;
                     }
@@ -97,46 +104,43 @@ public class ChatbotService {
                 }
             }
 
-            // 4. Obtener el resultado final de la IA
+            // 4. Obtener el resultado final
             String recetaCompleta;
             try {
-                recetaCompleta = futureReceta.get(); // Esto ya será inmediato porque isDone es true
+                recetaCompleta = futureReceta.get(); // Ya está lista, retorna inmediato
             } catch (Exception e) {
-                throw new RuntimeException("Error al obtener resultado de IA", e);
+                throw new RuntimeException("Error al obtener respuesta de IA", e);
             }
 
-            // --- A PARTIR DE AQUÍ ES IGUAL A TU CÓDIGO ORIGINAL ---
+            // --- A PARTIR DE AQUÍ ES TU LÓGICA ORIGINAL DE FRAGMENTACIÓN ---
 
-            // Verificar si la respuesta es un mensaje de error
             if (recetaCompleta.contains("Lo sentimos, estamos experimentando una alta demanda")) {
-                throw new RuntimeException("Service unavailable - returned error message");
+                throw new RuntimeException("Service unavailable");
             }
 
-            System.out.println("📝 Receta lista - Longitud: " + recetaCompleta.length());
+            System.out.println("📝 Receta generada y conexión viva. Enviando...");
 
-            // Verificar validez
-            boolean esRecetaValida = esRecetaValida(recetaCompleta);
-
-            if (!esRecetaValida) {
-                // ... Lógica de respuesta no válida (copia tu lógica original aquí) ...
-                // Para simplificar el ejemplo, asumo el flujo normal:
+            if (!esRecetaValida(recetaCompleta)) {
+                // Caso de respuesta corta (no receta)
                 enviarRespuestaFragmentada(recetaCompleta, emitter);
-                // Finalizar
+
+                Thread.sleep(500);
                 Map<String, Object> completoEvent = new HashMap<>();
-                completoEvent.put("data", "✅ Fin");
+                completoEvent.put("data", "✅ Consulta completada!");
                 completoEvent.put("type", "completo");
                 emitter.send(SseEmitter.event().name("completo").data(completoEvent));
                 emitter.complete();
                 return;
             }
 
-            // Mensaje de que ya tenemos la receta
+            // Mensaje final antes de empezar a escribir la receta
             Map<String, Object> preparandoEvent = new HashMap<>();
             preparandoEvent.put("data", "📝 ¡Receta lista! Escribiendo...");
             preparandoEvent.put("type", "empezando");
             emitter.send(SseEmitter.event().name("inicio").data(preparandoEvent));
+            Thread.sleep(500);
 
-            // 5. Streaming del texto (Tu lógica original de fragmentación)
+            // Enviar fragmentos (Tu lógica original)
             String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
             long delayFragmento = 30;
 
@@ -155,7 +159,7 @@ public class ChatbotService {
                 }
             }
 
-            // 6. Mensaje de cierre IA
+            // Mensaje de cierre
             String mensajeCierre = generarMensajeCierreGenerico(recetaCompleta);
             String mensajeCompleto = "\n\n---\n\n" + mensajeCierre;
             String[] fragmentosCierre = mensajeCompleto.split("(?<=\\s)|(?<=\\n)");
@@ -177,14 +181,21 @@ public class ChatbotService {
             completoEvent.put("data", "✅ Receta completada!");
             completoEvent.put("type", "completo");
             emitter.send(SseEmitter.event().name("completo").data(completoEvent));
+
+            System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE");
             emitter.complete();
 
         } catch (Exception e) {
-            System.err.println("❌ Error en streaming: " + e.getMessage());
+            System.err.println("❌ Error global en streaming: " + e.getMessage());
             try {
-                emitter.completeWithError(e);
+                // Intentar enviar error al cliente si el tubo no está roto
+                Map<String, Object> errorEvent = new HashMap<>();
+                errorEvent.put("data", "❌ Error: " + e.getMessage());
+                errorEvent.put("type", "service_error");
+                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
+                emitter.complete();
             } catch (Exception ex) {
-                // Ignorar si ya estaba cerrado
+                // Si falla aquí es que ya no hay conexión, no hacemos nada
             }
         }
     }
