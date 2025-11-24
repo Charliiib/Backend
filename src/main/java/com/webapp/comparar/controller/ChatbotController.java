@@ -17,7 +17,11 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = {
+        "https://frontend-pi-jet-42.vercel.app",
+        "https://tu-frontend.vercel.app",
+        "http://localhost:3000"
+}, maxAge = 3600)
 public class ChatbotController {
 
     @Autowired
