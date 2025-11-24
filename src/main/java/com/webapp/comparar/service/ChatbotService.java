@@ -42,6 +42,19 @@ public class ChatbotService {
         try {
             System.out.println("🚀 INICIANDO STREAMING para: " + mensajeUsuario);
 
+            // Verificar conexión periódicamente
+            emitter.onCompletion(() -> {
+                System.out.println("✅ SSE Emitter completado");
+            });
+
+            emitter.onTimeout(() -> {
+                System.out.println("⏰ SSE Emitter timeout");
+            });
+
+            emitter.onError((ex) -> {
+                System.err.println("❌ SSE Emitter error: " + ex.getMessage());
+            });
+
             // 1. Evento de inicio
             Map<String, Object> inicioEvent = new HashMap<>();
             inicioEvent.put("data", "🤖 Analizando tu consulta" +
