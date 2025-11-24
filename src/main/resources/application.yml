@@ -1,5 +1,16 @@
 server:
   port: ${PORT:8080}
+  connection-timeout: 30000
+
+  tomcat:
+    # Timeout de conexión en milisegundos (30 segundos)
+    connection-timeout: 30000
+    # Tiempo máximo para mantener una conexión alive (puede ayudar)
+    keep-alive-timeout: 30000
+    # Número máximo de hilos (puede ayudar a manejar múltiples conexiones)
+    max-threads: 200
+    # Tamaño máximo de la cola de solicitudes
+    max-connections: 10000
 
 spring:
   application:
