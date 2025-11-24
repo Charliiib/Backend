@@ -17,11 +17,14 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ChatbotService {
 
-    @Value("${google.ai.api.key}")
+    @Value("${google_ai_api_key}")
     private String apiKey;
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
@@ -39,153 +42,178 @@ public class ChatbotService {
     }
 
     public void obtenerRespuestaConStreaming(String mensajeUsuario, boolean isAuthenticated, SseEmitter emitter) {
+        AtomicBoolean isClientConnected = new AtomicBoolean(true);
+        CompletableFuture<Void> heartbeatFuture = null;
+
         try {
-            System.out.println("🚀 INICIANDO STREAMING para: " + mensajeUsuario);
+            System.out.println("🚀 INICIANDO STREAMING EN RAILWAY para: " + mensajeUsuario);
 
-            // 1. Evento de inicio
-            Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Analizando tu consulta" +
-                    "<span class='dot-animation'>.</span>" +
-                    "<span class='dot-animation' style='animation-delay: 0.2s;'>.</span>" +
-                    "<span class='dot-animation' style='animation-delay: 0.4s;'>.</span>");
-            inicioEvent.put("type", "inicio");
-            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-            Thread.sleep(2000);
+            // 🔥 HEARTBEAT OPTIMIZADO PARA RAILWAY
+            heartbeatFuture = CompletableFuture.runAsync(() -> {
+                String[] frasesEspera = {
+                        "🤖 Conectando con chef virtual...",
+                        "👨‍🍳 Buscando ingredientes ideales...",
+                        "🔥 Precalentando el horno virtual...",
+                        "📖 Consultando recetas secretas...",
+                        "🔪 Cortando y preparando...",
+                        "🧂 Sazonando con IA...",
+                        "⏰ Calculando tiempos...",
+                        "🍕 Armando tu receta..."
+                };
 
-            // 2. Generar receta completa - CAPTURAR SI HAY ERROR
+                int contador = 0;
+                while (isClientConnected.get() && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        Thread.sleep(800); // 🔥 800ms entre heartbeats (más estable)
+
+                        String mensajeActual = frasesEspera[contador % frasesEspera.length];
+                        Map<String, Object> keepAliveEvent = new HashMap<>();
+                        keepAliveEvent.put("data", mensajeActual);
+                        keepAliveEvent.put("type", "heartbeat");
+                        keepAliveEvent.put("timestamp", System.currentTimeMillis());
+
+                        try {
+                            emitter.send(SseEmitter.event().name("heartbeat").data(keepAliveEvent));
+                            System.out.println("💓 Heartbeat Railway: " + mensajeActual);
+                        } catch (Exception e) {
+                            System.err.println("❌ Cliente desconectado - deteniendo heartbeat");
+                            isClientConnected.set(false);
+                            break;
+                        }
+
+                        contador++;
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            });
+
+            // 2. Ejecutar IA con TIMEOUT OPTIMIZADO
+            CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
+                try {
+                    System.out.println("🧠 Llamando a Gemini API desde Railway...");
+                    String resultado = generarRecetaConIA(mensajeUsuario, isAuthenticated);
+                    System.out.println("✅ Gemini API respondió correctamente");
+                    return resultado;
+                } catch (Exception e) {
+                    System.err.println("❌ Error en Gemini API: " + e.getMessage());
+                    throw new RuntimeException("Error en IA: " + e.getMessage());
+                }
+            });
+
+            // 3. Esperar con timeout de 30 segundos (más estable)
             String recetaCompleta;
             try {
-                recetaCompleta = generarRecetaConIA(mensajeUsuario, isAuthenticated);
+                recetaCompleta = futureReceta.get(30, TimeUnit.SECONDS);
 
-                // Verificar si la respuesta es un mensaje de error
-                if (recetaCompleta.contains("Lo sentimos, estamos experimentando una alta demanda")) {
-                    throw new RuntimeException("Service unavailable - returned error message");
-                }
-
-                System.out.println("📝 Receta generada - Longitud: " + recetaCompleta.length() + " caracteres");
-
-                // VERIFICAR SI ES UNA RESPUESTA DE RECETA VÁLIDA O UNA NEGACIÓN
-                boolean esRecetaValida = esRecetaValida(recetaCompleta);
-                System.out.println("🔍 ¿Es receta válida?: " + esRecetaValida);
-
-                if (!esRecetaValida) {
-                    // Si no es una receta válida, enviar solo la respuesta sin mensaje de cierre
-                    System.out.println("📝 Enviando respuesta sin mensaje de cierre (no es receta)");
-
-                    // 3. Evento de que empezó la generación
-                    Map<String, Object> generandoEvent = new HashMap<>();
-                    generandoEvent.put("data", "📝 Procesando tu consulta...");
-                    generandoEvent.put("type", "empezando");
-                    emitter.send(SseEmitter.event().name("inicio").data(generandoEvent));
-                    Thread.sleep(600);
-
-                    // 4. Enviar la respuesta sin mensaje de cierre
-                    enviarRespuestaFragmentada(recetaCompleta, emitter);
-
-                    // 5. Evento de completado
-                    Thread.sleep(500);
-                    Map<String, Object> completoEvent = new HashMap<>();
-                    completoEvent.put("data", "✅ Consulta completada!");
-                    completoEvent.put("type", "completo");
-                    emitter.send(SseEmitter.event().name("completo").data(completoEvent));
-
-                    System.out.println("🎉 STREAMING COMPLETADO (sin cierre)");
-                    emitter.complete();
-                    return;
+                // 🔥 DETENER HEARTBEAT INMEDIATAMENTE
+                isClientConnected.set(false);
+                if (heartbeatFuture != null) {
+                    heartbeatFuture.cancel(true);
                 }
 
             } catch (Exception e) {
-                // Si hay error en la generación, enviar mensaje de error y terminar
-                System.err.println("❌ Error al generar receta: " + e.getMessage());
+                // 🔥 DETENER HEARTBEAT EN CASO DE ERROR
+                isClientConnected.set(false);
+                if (heartbeatFuture != null) {
+                    heartbeatFuture.cancel(true);
+                }
 
-                Map<String, Object> errorEvent = new HashMap<>();
-                errorEvent.put("data", "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒");
-                errorEvent.put("type", "service_error");
-                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
-                emitter.complete();
+                if (e instanceof java.util.concurrent.TimeoutException) {
+                    System.err.println("⏰ Timeout: Gemini tardó más de 30 segundos");
+                    throw new RuntimeException("⏰ El servicio de recetas está saturado. Por favor, intenta de nuevo en unos momentos.");
+                } else {
+                    System.err.println("❌ Error al obtener respuesta: " + e.getMessage());
+                    throw new RuntimeException("❌ Error del servicio de IA. Por favor, intenta de nuevo.");
+                }
+            }
+
+            // 4. VERIFICAR SI EL CLIENTE SIGUE CONECTADO
+            if (!isClientConnected.get()) {
+                System.out.println("❌ Cliente ya se desconectó, no se envía la receta");
                 return;
             }
 
-            // 3. Evento de que empezó la generación (solo si la receta se generó correctamente Y es válida)
-            Map<String, Object> generandoEvent = new HashMap<>();
-            generandoEvent.put("data", "📝 Generando receta...");
-            generandoEvent.put("type", "empezando");
-            emitter.send(SseEmitter.event().name("inicio").data(generandoEvent));
-            Thread.sleep(600);
+            // 5. ENVIAR RECETA CON MANEJO DE ERRORES MEJORADO
+            try {
+                // Evento de inicio de receta
+                Map<String, Object> empezandoEvent = new HashMap<>();
+                empezandoEvent.put("data", "📝 ¡Receta lista! Transmitiendo...");
+                empezandoEvent.put("type", "empezando");
+                emitter.send(SseEmitter.event().name("inicio").data(empezandoEvent));
+                Thread.sleep(200);
 
-            // 4. DIVIDIR POR PALABRAS/FRAGMENTOS y enviar (solo si es receta válida)
-            String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
-            System.out.println("📊 Número de fragmentos a enviar: " + fragmentos.length);
+                // Enviar fragmentos de la receta
+                String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
+                long delayFragmento = 20; // 🔥 MÁS RÁPIDO para Railway
 
-            long delayFragmento = 30;
+                for (int i = 0; i < fragmentos.length; i++) {
+                    String fragmento = fragmentos[i];
+                    if (!fragmento.trim().isEmpty()) {
+                        Thread.sleep(delayFragmento);
 
-            for (int i = 0; i < fragmentos.length; i++) {
-                String fragmento = fragmentos[i];
+                        // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
+                        if (!isClientConnected.get()) {
+                            System.out.println("❌ Cliente desconectado durante envío, cancelando");
+                            return;
+                        }
 
-                if (!fragmento.trim().isEmpty()) {
-                    Thread.sleep(delayFragmento);
+                        Map<String, Object> lineaEvent = new HashMap<>();
+                        lineaEvent.put("linea", fragmento);
+                        lineaEvent.put("indice", i);
+                        lineaEvent.put("total", fragmentos.length);
+                        lineaEvent.put("progreso", (i + 1) * 100 / fragmentos.length);
+                        lineaEvent.put("esUltimo", i == fragmentos.length - 1);
+                        lineaEvent.put("type", "receta");
 
-                    Map<String, Object> lineaEvent = new HashMap<>();
-                    lineaEvent.put("linea", fragmento);
-                    lineaEvent.put("indice", i);
-                    lineaEvent.put("total", fragmentos.length);
-                    lineaEvent.put("progreso", (i + 1) * 100 / fragmentos.length);
-                    lineaEvent.put("esUltimo", i == fragmentos.length - 1);
-                    lineaEvent.put("type", "receta");
-
-                    emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
+                        emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
+                    }
                 }
-            }
 
-            // 4.1. SOLO AGREGAR MENSAJE DE CIERRE SI ES UNA RECETA VÁLIDA
-            String mensajeCierre = generarMensajeCierreGenerico(recetaCompleta);
+                // 6. EVENTO DE COMPLETADO
+                Thread.sleep(300);
+                Map<String, Object> completoEvent = new HashMap<>();
+                completoEvent.put("data", "✅ ¡Receta completada! ¡Buen provecho! 🍽️");
+                completoEvent.put("type", "completo");
 
-            String separador = "\n\n---\n\n";
-            String mensajeCompleto = separador + mensajeCierre;
-
-            String[] fragmentosCierre = mensajeCompleto.split("(?<=\\s)|(?<=\\n)");
-            long delayFragmentoCierre = 45;
-
-            for (String fragmento : fragmentosCierre) {
-                if (!fragmento.trim().isEmpty()) {
-                    Thread.sleep(delayFragmentoCierre);
-
-                    Map<String, Object> cierreEvent = new HashMap<>();
-                    cierreEvent.put("linea", fragmento);
-                    cierreEvent.put("progreso", 100);
-                    cierreEvent.put("type", "receta");
-
-                    emitter.send(SseEmitter.event().name("receta").data(cierreEvent));
+                if (isClientConnected.get()) {
+                    emitter.send(SseEmitter.event().name("completo").data(completoEvent));
+                    System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE EN RAILWAY");
+                    emitter.complete();
+                } else {
+                    System.out.println("ℹ️ Cliente ya desconectado, completando sin envío final");
+                    emitter.complete();
                 }
+
+            } catch (Exception e) {
+                System.err.println("❌ Error durante el envío de la receta: " + e.getMessage());
+                throw e;
             }
-
-            // 5. Evento de completado
-            Thread.sleep(500);
-            Map<String, Object> completoEvent = new HashMap<>();
-            completoEvent.put("data", "✅ Receta completada!");
-            completoEvent.put("type", "completo");
-            emitter.send(SseEmitter.event().name("completo").data(completoEvent));
-
-            System.out.println("🎉 STREAMING COMPLETADO (con cierre)");
-
-            emitter.complete();
 
         } catch (Exception e) {
-            System.err.println("❌ Error en streaming: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("❌ Error global en streaming Railway: " + e.getMessage());
+            isClientConnected.set(false);
+            if (heartbeatFuture != null) {
+                heartbeatFuture.cancel(true);
+            }
 
             try {
                 Map<String, Object> errorEvent = new HashMap<>();
-                errorEvent.put("data", "❌ Lo sentimos, estamos experimentando una alta demanda en este momento. Por favor, vuelve a probar en unos minutos. 🕒");
-                errorEvent.put("type", "service_error");
-                emitter.send(SseEmitter.event().name("service_error").data(errorEvent));
+                errorEvent.put("data", "⚠️ " + e.getMessage());
+                errorEvent.put("type", "error");
+                errorEvent.put("timestamp", System.currentTimeMillis());
+                emitter.send(SseEmitter.event().name("error").data(errorEvent));
                 emitter.complete();
             } catch (Exception ex) {
-                emitter.completeWithError(e);
+                try {
+                    emitter.complete();
+                } catch (Exception finalEx) {
+                    // Ignorar cualquier error final
+                }
             }
         }
     }
-
     // NUEVO MÉTODO: Verificar si la respuesta es una receta válida
     private boolean esRecetaValida(String respuesta) {
         if (respuesta == null || respuesta.trim().isEmpty()) {
@@ -556,6 +584,4 @@ public class ChatbotService {
 
         return prompt.toString();
     }
-
-
 }
