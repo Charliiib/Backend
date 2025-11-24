@@ -10,10 +10,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -21,6 +17,9 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ChatbotService {
@@ -49,7 +48,13 @@ public class ChatbotService {
         try {
             System.out.println("🚀 INICIANDO STREAMING (con Heartbeat ULTRA RÁPIDO) para: " + mensajeUsuario);
 
-            // 1. Heartbeat INMEDIATO y MUCHO MÁS RÁPIDO
+            // 🔥 SOLUCIÓN: ENVIAR PRIMER HEARTBEAT INMEDIATAMENTE
+            Map<String, Object> inicioEvent = new HashMap<>();
+            inicioEvent.put("data", "🎯 Iniciando análisis de: \"" + mensajeUsuario + "\"");
+            inicioEvent.put("type", "inicio");
+            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
+
+            // 1. Heartbeat MUCHO MÁS RÁPIDO - CADA 200ms
             heartbeatFuture = CompletableFuture.runAsync(() -> {
                 String[] frasesEspera = {
                         "🤖 Conectando con chef virtual...",
@@ -65,7 +70,7 @@ public class ChatbotService {
                 int contador = 0;
                 while (isClientConnected.get() && !Thread.currentThread().isInterrupted()) {
                     try {
-                        Thread.sleep(300); // ⬅️ SOLUCIÓN: 300ms ENTRE HEARTBEATS
+                        Thread.sleep(200); // ⬅️ SOLUCIÓN: 200ms ENTRE HEARTBEATS
 
                         String mensajeActual = frasesEspera[contador % frasesEspera.length];
                         Map<String, Object> keepAliveEvent = new HashMap<>();
@@ -89,44 +94,46 @@ public class ChatbotService {
                 }
             });
 
-            // 2. Enviar evento de inicio DESPUÉS de iniciar heartbeat
-            Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🎯 Analizando: \"" + mensajeUsuario + "\"");
-            inicioEvent.put("type", "inicio");
-            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-
-            // 3. Ejecutar IA con TIMEOUT CORTO
+            // 2. Ejecutar IA con TIMEOUT MÁS CORTO
             CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
                 try {
                     System.out.println("🧠 Llamando a Gemini API...");
                     String resultado = generarRecetaConIA(mensajeUsuario, isAuthenticated);
-                    isClientConnected.set(false); // Detener heartbeat cuando termine
                     return resultado;
                 } catch (Exception e) {
-                    isClientConnected.set(false);
                     throw new RuntimeException("Error en IA: " + e.getMessage());
                 }
             });
 
-            // 4. Esperar con timeout de 25 segundos
+            // 3. Esperar con timeout de 20 segundos
             String recetaCompleta;
             try {
-                recetaCompleta = futureReceta.get(25, TimeUnit.SECONDS);
-                if (heartbeatFuture != null) {
-                    heartbeatFuture.cancel(true); // Cancelar heartbeat
-                }
-            } catch (TimeoutException e) {
+                recetaCompleta = futureReceta.get(20, TimeUnit.SECONDS);
+
+                // 🔥 DETENER HEARTBEAT INMEDIATAMENTE
                 isClientConnected.set(false);
                 if (heartbeatFuture != null) {
                     heartbeatFuture.cancel(true);
                 }
-                throw new RuntimeException("⏰ Timeout: Gemini tardó más de 25 segundos");
+
             } catch (Exception e) {
+                // 🔥 DETENER HEARTBEAT EN CASO DE ERROR
                 isClientConnected.set(false);
                 if (heartbeatFuture != null) {
                     heartbeatFuture.cancel(true);
                 }
-                throw new RuntimeException("Error al obtener respuesta: " + e.getMessage());
+
+                if (e instanceof java.util.concurrent.TimeoutException) {
+                    throw new RuntimeException("⏰ Timeout: Gemini tardó más de 20 segundos");
+                } else {
+                    throw new RuntimeException("Error al obtener respuesta: " + e.getMessage());
+                }
+            }
+
+            // 4. VERIFICAR SI EL CLIENTE SIGUE CONECTADO ANTES DE ENVIAR
+            if (!isClientConnected.get()) {
+                System.out.println("❌ Cliente ya se desconectó, no se envía la receta");
+                return;
             }
 
             // 5. Si llegamos aquí, enviar la receta completa
@@ -173,6 +180,12 @@ public class ChatbotService {
                     lineaEvent.put("progreso", (i + 1) * 100 / fragmentos.length);
                     lineaEvent.put("esUltimo", i == fragmentos.length - 1);
                     lineaEvent.put("type", "receta");
+
+                    // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
+                    if (!isClientConnected.get()) {
+                        System.out.println("❌ Cliente desconectado durante envío, cancelando");
+                        return;
+                    }
                     emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
                 }
             }
@@ -189,6 +202,12 @@ public class ChatbotService {
                     cierreEvent.put("linea", fragmento);
                     cierreEvent.put("progreso", 100);
                     cierreEvent.put("type", "receta");
+
+                    // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
+                    if (!isClientConnected.get()) {
+                        System.out.println("❌ Cliente desconectado durante cierre, cancelando");
+                        return;
+                    }
                     emitter.send(SseEmitter.event().name("receta").data(cierreEvent));
                 }
             }
@@ -198,10 +217,16 @@ public class ChatbotService {
             Map<String, Object> completoEvent = new HashMap<>();
             completoEvent.put("data", "✅ Receta completada!");
             completoEvent.put("type", "completo");
-            emitter.send(SseEmitter.event().name("completo").data(completoEvent));
 
-            System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE");
-            emitter.complete();
+            // 🔥 VERIFICAR CONEXIÓN ANTES DE ENVÍO FINAL
+            if (isClientConnected.get()) {
+                emitter.send(SseEmitter.event().name("completo").data(completoEvent));
+                System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE");
+                emitter.complete();
+            } else {
+                System.out.println("ℹ️  Cliente ya desconectado, completando sin envío final");
+                emitter.complete();
+            }
 
         } catch (Exception e) {
             System.err.println("❌ Error global en streaming: " + e.getMessage());

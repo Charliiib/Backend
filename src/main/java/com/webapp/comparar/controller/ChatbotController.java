@@ -7,12 +7,15 @@ import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
@@ -30,18 +33,29 @@ public class ChatbotController {
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 ULTRA-RÁPIDO: Solicitud recibida -> " + mensaje);
+        System.out.println("🎯 SOLUCIÓN DEFINITIVA: Solicitud recibida -> " + mensaje);
 
-        // ⬅️ TIMEOUT MÁS CORTO pero con heartbeat ultra-rápido
-        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos máximo
+        // ⬅️ TIMEOUT MÁS LARGO para dar tiempo a la IA
+        SseEmitter emitter = new SseEmitter(180000L); // 3 minutos máximo
 
-        // 🔥 CONFIGURACIÓN ANTIDESCONEXIÓN
-        emitter.onCompletion(() -> System.out.println("✅ SSE Completado"));
+        // 🔥 CONFIGURACIÓN MEJORADA ANTIDESCONEXIÓN
+        emitter.onCompletion(() -> {
+            System.out.println("✅ SSE Completado normalmente");
+        });
+
         emitter.onTimeout(() -> {
-            System.out.println("⏰ SSE Timeout (2min)");
+            System.out.println("⏰ SSE Timeout (3min) - Cerrando conexión");
             emitter.complete();
         });
-        emitter.onError((e) -> System.err.println("❌ SSE Error: " + e.getMessage()));
+
+        emitter.onError((e) -> {
+            System.err.println("❌ SSE Error: " + e.getMessage());
+            try {
+                emitter.complete();
+            } catch (Exception ex) {
+                // Ignorar errores al completar
+            }
+        });
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
@@ -50,11 +64,21 @@ public class ChatbotController {
             try {
                 chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
             } catch (Exception e) {
-                System.err.println("❌ Error en controller async: " + e.getMessage());
+                System.err.println("❌ Error crítico en controller async: " + e.getMessage());
                 try {
-                    emitter.completeWithError(e);
+                    // Intentar enviar error final
+                    Map<String, Object> errorEvent = new HashMap<>();
+                    errorEvent.put("data", "❌ Error crítico: " + e.getMessage());
+                    errorEvent.put("type", "error_fatal");
+                    emitter.send(SseEmitter.event().name("error_fatal").data(errorEvent));
+                    emitter.complete();
                 } catch (Exception ex) {
-                    // Ignorar si ya está completo
+                    // Si falla, simplemente completar
+                    try {
+                        emitter.complete();
+                    } catch (Exception finalEx) {
+                        // Ignorar cualquier error final
+                    }
                 }
             }
         });
