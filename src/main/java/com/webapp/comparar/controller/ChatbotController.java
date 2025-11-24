@@ -18,7 +18,7 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
-@CrossOrigin(origins = "*")
+
 public class ChatbotController {
 
     @Autowired
