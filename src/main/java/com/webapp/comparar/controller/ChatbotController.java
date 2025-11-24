@@ -6,12 +6,14 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
+@CrossOrigin(origins = "*") // 🔥 CORS GLOBAL para Railway
 public class ChatbotController {
 
     @Autowired
@@ -31,25 +34,36 @@ public class ChatbotController {
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            HttpServletResponse response) { // 🔥 AGREGAR HttpServletResponse
 
-        System.out.println("🎯 SOLUCIÓN DEFINITIVA: Solicitud recibida -> " + mensaje);
+        System.out.println("🎯 SOLUCIÓN RAILWAY: Solicitud recibida -> " + mensaje);
 
-        // ⬅️ TIMEOUT MÁS LARGO para dar tiempo a la IA
+        // 🔥 HEADERS CORS MANUALES CRÍTICOS para Railway
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS, POST");
+        response.setHeader("Access-Control-Allow-Headers", "*");
+        response.setHeader("Access-Control-Expose-Headers", "*");
+        response.setHeader("Access-Control-Max-Age", "3600");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
+        response.setHeader("X-Accel-Buffering", "no"); // 🔥 IMPORTANTE para Nginx/Railway
+
+        // ⬅️ TIMEOUT EXTENDIDO para Railway
         SseEmitter emitter = new SseEmitter(180000L); // 3 minutos máximo
 
-        // 🔥 CONFIGURACIÓN MEJORADA ANTIDESCONEXIÓN
+        // 🔥 CONFIGURACIÓN MEJORADA RAILWAY
         emitter.onCompletion(() -> {
-            System.out.println("✅ SSE Completado normalmente");
+            System.out.println("✅ SSE Completado normalmente en Railway");
         });
 
         emitter.onTimeout(() -> {
-            System.out.println("⏰ SSE Timeout (3min) - Cerrando conexión");
+            System.out.println("⏰ SSE Timeout (3min) en Railway");
             emitter.complete();
         });
 
         emitter.onError((e) -> {
-            System.err.println("❌ SSE Error: " + e.getMessage());
+            System.err.println("❌ SSE Error en Railway: " + e.getMessage());
             try {
                 emitter.complete();
             } catch (Exception ex) {
@@ -59,6 +73,19 @@ public class ChatbotController {
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
+        // 🔥 ENVIAR EVENTO INICIAL INMEDIATO para mantener conexión
+        try {
+            Map<String, Object> inicioEvent = new HashMap<>();
+            inicioEvent.put("data", "🔄 Conectando con chef virtual...");
+            inicioEvent.put("type", "inicio");
+            inicioEvent.put("timestamp", System.currentTimeMillis());
+            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
+        } catch (Exception e) {
+            System.err.println("❌ Error enviando evento inicial: " + e.getMessage());
+            emitter.complete();
+            return emitter;
+        }
+
         // EJECUTAR EN HILO SEPARADO INMEDIATAMENTE
         CompletableFuture.runAsync(() -> {
             try {
@@ -66,14 +93,12 @@ public class ChatbotController {
             } catch (Exception e) {
                 System.err.println("❌ Error crítico en controller async: " + e.getMessage());
                 try {
-                    // Intentar enviar error final
                     Map<String, Object> errorEvent = new HashMap<>();
                     errorEvent.put("data", "❌ Error crítico: " + e.getMessage());
                     errorEvent.put("type", "error_fatal");
                     emitter.send(SseEmitter.event().name("error_fatal").data(errorEvent));
                     emitter.complete();
                 } catch (Exception ex) {
-                    // Si falla, simplemente completar
                     try {
                         emitter.complete();
                     } catch (Exception finalEx) {
@@ -84,6 +109,16 @@ public class ChatbotController {
         });
 
         return emitter;
+    }
+
+    // 🔥 AGREGAR ENDPOINT DE HEALTH CHECK para Railway
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> healthCheck() {
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        response.put("service", "chatbot-streaming");
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/consulta")

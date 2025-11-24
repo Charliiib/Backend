@@ -46,15 +46,9 @@ public class ChatbotService {
         CompletableFuture<Void> heartbeatFuture = null;
 
         try {
-            System.out.println("🚀 INICIANDO STREAMING (con Heartbeat ULTRA RÁPIDO) para: " + mensajeUsuario);
+            System.out.println("🚀 INICIANDO STREAMING EN RAILWAY para: " + mensajeUsuario);
 
-            // 🔥 SOLUCIÓN: ENVIAR PRIMER HEARTBEAT INMEDIATAMENTE
-            Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🎯 Iniciando análisis de: \"" + mensajeUsuario + "\"");
-            inicioEvent.put("type", "inicio");
-            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-
-            // 1. Heartbeat MUCHO MÁS RÁPIDO - CADA 200ms
+            // 🔥 HEARTBEAT MÁS RÁPIDO Y ROBUSTO
             heartbeatFuture = CompletableFuture.runAsync(() -> {
                 String[] frasesEspera = {
                         "🤖 Conectando con chef virtual...",
@@ -70,16 +64,17 @@ public class ChatbotService {
                 int contador = 0;
                 while (isClientConnected.get() && !Thread.currentThread().isInterrupted()) {
                     try {
-                        Thread.sleep(200); // ⬅️ SOLUCIÓN: 200ms ENTRE HEARTBEATS
+                        Thread.sleep(500); // 🔥 500ms entre heartbeats
 
                         String mensajeActual = frasesEspera[contador % frasesEspera.length];
                         Map<String, Object> keepAliveEvent = new HashMap<>();
                         keepAliveEvent.put("data", mensajeActual);
                         keepAliveEvent.put("type", "heartbeat");
+                        keepAliveEvent.put("timestamp", System.currentTimeMillis());
 
                         try {
                             emitter.send(SseEmitter.event().name("heartbeat").data(keepAliveEvent));
-                            System.out.println("💓 Heartbeat ultra-rápido: " + mensajeActual);
+                            System.out.println("💓 Heartbeat enviado: " + mensajeActual);
                         } catch (Exception e) {
                             System.err.println("❌ Cliente desconectado - deteniendo heartbeat");
                             isClientConnected.set(false);
@@ -97,7 +92,7 @@ public class ChatbotService {
             // 2. Ejecutar IA con TIMEOUT MÁS CORTO
             CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
                 try {
-                    System.out.println("🧠 Llamando a Gemini API...");
+                    System.out.println("🧠 Llamando a Gemini API desde Railway...");
                     String resultado = generarRecetaConIA(mensajeUsuario, isAuthenticated);
                     return resultado;
                 } catch (Exception e) {
@@ -105,10 +100,10 @@ public class ChatbotService {
                 }
             });
 
-            // 3. Esperar con timeout de 20 segundos
+            // 3. Esperar con timeout de 25 segundos
             String recetaCompleta;
             try {
-                recetaCompleta = futureReceta.get(20, TimeUnit.SECONDS);
+                recetaCompleta = futureReceta.get(25, TimeUnit.SECONDS);
 
                 // 🔥 DETENER HEARTBEAT INMEDIATAMENTE
                 isClientConnected.set(false);
@@ -124,7 +119,7 @@ public class ChatbotService {
                 }
 
                 if (e instanceof java.util.concurrent.TimeoutException) {
-                    throw new RuntimeException("⏰ Timeout: Gemini tardó más de 20 segundos");
+                    throw new RuntimeException("⏰ Timeout: Gemini tardó más de 25 segundos");
                 } else {
                     throw new RuntimeException("Error al obtener respuesta: " + e.getMessage());
                 }
@@ -136,43 +131,28 @@ public class ChatbotService {
                 return;
             }
 
-            // 5. Si llegamos aquí, enviar la receta completa
-            System.out.println("✅ Receta obtenida, enviando al cliente...");
+            // 5. Enviar evento de inicio de receta
+            Map<String, Object> empezandoEvent = new HashMap<>();
+            empezandoEvent.put("data", "📝 ¡Receta lista! Transmitiendo...");
+            empezandoEvent.put("type", "empezando");
+            emitter.send(SseEmitter.event().name("inicio").data(empezandoEvent));
+            Thread.sleep(300);
 
-            if (recetaCompleta.contains("Lo sentimos, estamos experimentando una alta demanda")) {
-                throw new RuntimeException("Service unavailable");
-            }
-
-            System.out.println("📝 Receta generada y conexión viva. Enviando...");
-
-            if (!esRecetaValida(recetaCompleta)) {
-                // Caso de respuesta corta (no receta)
-                enviarRespuestaFragmentada(recetaCompleta, emitter);
-
-                Thread.sleep(500);
-                Map<String, Object> completoEvent = new HashMap<>();
-                completoEvent.put("data", "✅ Consulta completada!");
-                completoEvent.put("type", "completo");
-                emitter.send(SseEmitter.event().name("completo").data(completoEvent));
-                emitter.complete();
-                return;
-            }
-
-            // Mensaje final antes de empezar a escribir la receta
-            Map<String, Object> preparandoEvent = new HashMap<>();
-            preparandoEvent.put("data", "📝 ¡Receta lista! Escribiendo...");
-            preparandoEvent.put("type", "empezando");
-            emitter.send(SseEmitter.event().name("inicio").data(preparandoEvent));
-            Thread.sleep(500);
-
-            // Enviar fragmentos (Tu lógica original)
+            // 6. Enviar fragmentos de la receta
             String[] fragmentos = recetaCompleta.split("(?<=\\s)|(?<=\\n)");
-            long delayFragmento = 30;
+            long delayFragmento = 25; // 🔥 MÁS RÁPIDO para Railway
 
             for (int i = 0; i < fragmentos.length; i++) {
                 String fragmento = fragmentos[i];
                 if (!fragmento.trim().isEmpty()) {
                     Thread.sleep(delayFragmento);
+
+                    // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
+                    if (!isClientConnected.get()) {
+                        System.out.println("❌ Cliente desconectado durante envío, cancelando");
+                        return;
+                    }
+
                     Map<String, Object> lineaEvent = new HashMap<>();
                     lineaEvent.put("linea", fragmento);
                     lineaEvent.put("indice", i);
@@ -181,55 +161,27 @@ public class ChatbotService {
                     lineaEvent.put("esUltimo", i == fragmentos.length - 1);
                     lineaEvent.put("type", "receta");
 
-                    // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
-                    if (!isClientConnected.get()) {
-                        System.out.println("❌ Cliente desconectado durante envío, cancelando");
-                        return;
-                    }
                     emitter.send(SseEmitter.event().name("receta").data(lineaEvent));
                 }
             }
 
-            // Mensaje de cierre
-            String mensajeCierre = generarMensajeCierreGenerico(recetaCompleta);
-            String mensajeCompleto = "\n\n---\n\n" + mensajeCierre;
-            String[] fragmentosCierre = mensajeCompleto.split("(?<=\\s)|(?<=\\n)");
-
-            for (String fragmento : fragmentosCierre) {
-                if (!fragmento.trim().isEmpty()) {
-                    Thread.sleep(45);
-                    Map<String, Object> cierreEvent = new HashMap<>();
-                    cierreEvent.put("linea", fragmento);
-                    cierreEvent.put("progreso", 100);
-                    cierreEvent.put("type", "receta");
-
-                    // 🔥 VERIFICAR CONEXIÓN ANTES DE CADA ENVÍO
-                    if (!isClientConnected.get()) {
-                        System.out.println("❌ Cliente desconectado durante cierre, cancelando");
-                        return;
-                    }
-                    emitter.send(SseEmitter.event().name("receta").data(cierreEvent));
-                }
-            }
-
-            // Finalizar
+            // 7. Mensaje de cierre
             Thread.sleep(500);
             Map<String, Object> completoEvent = new HashMap<>();
-            completoEvent.put("data", "✅ Receta completada!");
+            completoEvent.put("data", "✅ Receta completada en Railway!");
             completoEvent.put("type", "completo");
 
-            // 🔥 VERIFICAR CONEXIÓN ANTES DE ENVÍO FINAL
             if (isClientConnected.get()) {
                 emitter.send(SseEmitter.event().name("completo").data(completoEvent));
-                System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE");
+                System.out.println("🎉 STREAMING COMPLETADO EXITOSAMENTE EN RAILWAY");
                 emitter.complete();
             } else {
-                System.out.println("ℹ️  Cliente ya desconectado, completando sin envío final");
+                System.out.println("ℹ️ Cliente ya desconectado, completando sin envío final");
                 emitter.complete();
             }
 
         } catch (Exception e) {
-            System.err.println("❌ Error global en streaming: " + e.getMessage());
+            System.err.println("❌ Error global en streaming Railway: " + e.getMessage());
             isClientConnected.set(false);
             if (heartbeatFuture != null) {
                 heartbeatFuture.cancel(true);
@@ -237,12 +189,11 @@ public class ChatbotService {
 
             try {
                 Map<String, Object> errorEvent = new HashMap<>();
-                errorEvent.put("data", "⚠️ " + e.getMessage());
+                errorEvent.put("data", "⚠️ Error: " + e.getMessage());
                 errorEvent.put("type", "error");
                 emitter.send(SseEmitter.event().name("error").data(errorEvent));
                 emitter.complete();
             } catch (Exception ex) {
-                // Si falla aquí es que ya no hay conexión
                 try {
                     emitter.complete();
                 } catch (Exception finalEx) {

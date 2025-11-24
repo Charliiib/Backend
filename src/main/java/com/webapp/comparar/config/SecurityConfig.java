@@ -29,7 +29,6 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtRequestFilter jwtRequestFilter;
 
-    // Variables de entorno para CORS - Railway/Vercel
     @Value("${cors.allowed-origins:https://frontend-pi-jet-42.vercel.app,http://localhost:3000,http://localhost:5173,http://localhost:5174}")
     private String allowedOrigins;
 
@@ -50,7 +49,7 @@ public class SecurityConfig {
                 .cors().configurationSource(corsConfigurationSource()).and()
                 .csrf().disable()
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health").permitAll() // Health check para Railway
+                        .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/productos/**").permitAll()
@@ -58,8 +57,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/comercios/**").permitAll()
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
-                        .requestMatchers("/api/chatbot/consulta-stream").permitAll() // SSE endpoint
-                        .requestMatchers("/api/chatbot/**").permitAll() // Para CORS completo del chatbot
+                        .requestMatchers("/api/chatbot/health").permitAll() // 🔥 NUEVO health check
+                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
+                        .requestMatchers("/api/chatbot/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
@@ -71,25 +71,26 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // 🔥 CONFIGURACIÓN CORS OPTIMIZADA PARA RAILWAY + VERCEL + SSE
+    // 🔥 CONFIGURACIÓN CORS MEJORADA PARA RAILWAY
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Parse origins from environment variable
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        // Orígenes explícitos para Railway + Vercel
         configuration.setAllowedOrigins(Arrays.asList(
                 "https://frontend-pi-jet-42.vercel.app",
-                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app", // Si usas ramas de preview
-                "http://localhost:3000"
+                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app",
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:5174"
         ));
 
-        // Métodos permitidos (incluye OPTIONS para preflight)
+        // 🔥 MÉTODOS PERMITIDOS (CRÍTICO para SSE)
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
         ));
 
-        // Headers permitidos (específico para SSE y Auth)
+        // 🔥 HEADERS PERMITIDOS (ESPECÍFICO para SSE)
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -105,10 +106,12 @@ public class SecurityConfig {
                 "Access-Control-Allow-Origin",
                 "Access-Control-Allow-Methods",
                 "Access-Control-Allow-Headers",
-                "Last-Event-ID"
+                "Last-Event-ID", // 🔥 CRÍTICO para SSE
+                "Accept-Encoding",
+                "Accept-Language"
         ));
 
-        // Headers expuestos (importante para SSE)
+        // 🔥 HEADERS EXPUESTOS (CRÍTICO para SSE)
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -119,21 +122,17 @@ public class SecurityConfig {
                 "Content-Encoding",
                 "Last-Modified",
                 "ETag",
-                "Last-Event-ID"
+                "Last-Event-ID", // 🔥 CRÍTICO para SSE
+                "X-Accel-Buffering" // 🔥 PARA NGINX/RAILWAY
         ));
 
-        // Configuración específica para SSE
-        configuration.setAllowCredentials(true); // Permite cookies/credenciales
-        configuration.setMaxAge(3600L); // Cache de preflight por 1 hora
-
-        // Configuraciones adicionales para compatibilidad
         configuration.setAllowCredentials(true);
-        configuration.applyPermitDefaultValues();
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
 
-        System.out.println("🌍 CORS configurado para Railway/Vercel con orígenes: " + origins);
+        System.out.println("🌍 CORS Configurado para Railway con orígenes: " + configuration.getAllowedOrigins());
         return source;
     }
 
