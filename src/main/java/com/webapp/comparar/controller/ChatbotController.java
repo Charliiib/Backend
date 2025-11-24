@@ -34,7 +34,13 @@ public class ChatbotController {
         System.out.println("🎯 Controller: Solicitud recibida -> " + mensaje);
 
         // 1. Crear el Emitter con un timeout largo (5 minutos)
-        SseEmitter emitter = new SseEmitter(300000L);
+        SseEmitter emitter = new SseEmitter(600000L);
+
+        // ⬅️ AGREGAR timeout de respuesta también
+        emitter.onTimeout(() -> {
+            System.out.println("⏰ Timeout del emitter alcanzado");
+            emitter.complete();
+        });
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
@@ -56,7 +62,7 @@ public class ChatbotController {
 
         // B. Estándares SSE
         headers.set("Content-Type", "text/event-stream");
-        headers.set("Cache-Control", "no-cache");
+        headers.set("Cache-Control", "no-cache, no-transform");
         headers.set("Connection", "keep-alive");
 
         // C. CORS "Hardcoded" (Para descartar problemas de SecurityConfig)

@@ -51,7 +51,6 @@ public class ChatbotService {
             emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
 
             // 2. Ejecutar la llamada a la IA en un HILO SEPARADO (Asíncrono)
-            // Esto permite que el hilo principal siga enviando mensajes mientras este trabaja
             CompletableFuture<String> futureReceta = CompletableFuture.supplyAsync(() -> {
                 try {
                     return generarRecetaConIA(mensajeUsuario, isAuthenticated);
@@ -60,8 +59,7 @@ public class ChatbotService {
                 }
             });
 
-            // 3. BUCLE DE ESPERA ACTIVA (Heartbeat)
-            // Frases para rotar mientras esperamos
+            // 3. BUCLE DE ESPERA ACTIVA (Heartbeat) - Ahora cada 1 segundo
             String[] frasesEspera = {
                     "👨‍🍳 Buscando los mejores ingredientes...",
                     "🔥 Calentando los fogones...",
@@ -75,9 +73,9 @@ public class ChatbotService {
 
             // Mientras la IA no haya terminado...
             while (!futureReceta.isDone()) {
-                // Esperamos 1.5 segundos
+                // Esperamos 1 segundo
                 try {
-                    Thread.sleep(1500);
+                    Thread.sleep(1000);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                 }
@@ -88,14 +86,12 @@ public class ChatbotService {
 
                     Map<String, Object> keepAliveEvent = new HashMap<>();
                     keepAliveEvent.put("data", mensajeActual);
-                    keepAliveEvent.put("type", "inicio"); // Usamos 'inicio' para que actualice el texto de carga en el front
+                    keepAliveEvent.put("type", "inicio");
 
                     try {
-                        // 🔥 ESTO ES LO QUE EVITA EL BROKEN PIPE / 502
                         emitter.send(SseEmitter.event().name("inicio").data(keepAliveEvent));
                         System.out.println("💓 Heartbeat enviado: " + mensajeActual);
                     } catch (Exception e) {
-                        // Si falla el envío aquí, es que el cliente se fue de verdad. Cancelamos todo.
                         System.err.println("❌ Cliente desconectado durante la espera. Cancelando IA.");
                         futureReceta.cancel(true);
                         return;
