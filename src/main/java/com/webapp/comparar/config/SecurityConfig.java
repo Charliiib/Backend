@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.config.Customizer;
 
 import java.util.Arrays;
 import java.util.List;
@@ -43,9 +44,19 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                // CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+
+                // CSRF: ignorar solo SSE
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/api/chatbot/consulta-stream")
+                        .disable()
+                )
+
+                // AUTH
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
+                        .requestMatchers("/api/chatbot/consulta").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/productos/**").permitAll()
                         .requestMatchers("/api/barrios/**").permitAll()
@@ -53,20 +64,21 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
-                        .requestMatchers("/api/chatbot/**").permitAll()
-                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
-
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+
+                // SESSIONLESS
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 🔥 IMPORTANTE: permitir SSE
+                // HEADERS
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.disable())
-                        .contentTypeOptions(contentType -> contentType.disable())
-                );
+                        .httpStrictTransportSecurity(hsts -> hsts.disable())
+                )
 
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint));
+
+        // JWT FILTER
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -77,7 +89,6 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🔥 IMPORTANTE: Railway no funciona bien con allowedOriginPatterns
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://frontend-pi-jet-42.vercel.app",
@@ -85,7 +96,10 @@ public class SecurityConfig {
                 "https://*.vercel.app"
         ));
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -96,7 +110,6 @@ public class SecurityConfig {
                 "Access-Control-Request-Headers"
         ));
 
-        // 🔥 SSE necesita exponer Content-Type
         configuration.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type"
