@@ -7,6 +7,7 @@ import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,13 +18,6 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
-@CrossOrigin(origins = {
-        "https://frontend-pi-jet-42.vercel.app",
-        "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app/",
-        "https://frontend-jh3615d14-charlis-projects-6b04c52b.vercel.app/",
-        "https://tu-frontend.vercel.app",
-        "http://localhost:3000"
-}, maxAge = 3600)
 public class ChatbotController {
 
     @Autowired
@@ -33,13 +27,14 @@ public class ChatbotController {
     private ChatbotProductosService chatbotProductosService;
 
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter consultarRecetaConStreaming(
+    public ResponseEntity<SseEmitter> consultarRecetaConStreaming(
             @RequestParam String mensaje,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
         System.out.println("🎯 Controller recibió solicitud de streaming: " + mensaje);
 
-        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos timeout
+        // Aumentamos timeout a 5 minutos por si la IA tarda
+        SseEmitter emitter = new SseEmitter(300000L);
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
         CompletableFuture.runAsync(() -> {
@@ -51,7 +46,15 @@ public class ChatbotController {
             }
         });
 
-        return emitter;
+        // 🔥 FIX CLAVE: Headers para evitar buffering en Railway/Nginx
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Accel-Buffering", "no");
+        headers.set("Cache-Control", "no-cache");
+        headers.set("Connection", "keep-alive");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(emitter);
     }
 
     @PostMapping("/consulta")

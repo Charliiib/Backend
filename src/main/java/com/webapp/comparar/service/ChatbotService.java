@@ -21,7 +21,7 @@ import java.util.Random;
 @Service
 public class ChatbotService {
 
-    @Value("${google.ai.api.key}")
+    @Value("${google_ai_api_key}")
     private String apiKey;
 
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent";
@@ -50,7 +50,7 @@ public class ChatbotService {
                     "<span class='dot-animation' style='animation-delay: 0.4s;'>.</span>");
             inicioEvent.put("type", "inicio");
             emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-            Thread.sleep(2000);
+            Thread.sleep(100);
 
             // 2. Generar receta completa - CAPTURAR SI HAY ERROR
             String recetaCompleta;

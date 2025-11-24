@@ -78,7 +78,11 @@ public class SecurityConfig {
 
         // Parse origins from environment variable
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
+        configuration.setAllowedOrigins(Arrays.asList(
+                "https://frontend-pi-jet-42.vercel.app",
+                "http://localhost:3000"
+                // Agrega aquí cualquier otro dominio exacto que uses
+        ));
 
         // Métodos permitidos (incluye OPTIONS para preflight)
         configuration.setAllowedMethods(Arrays.asList(
