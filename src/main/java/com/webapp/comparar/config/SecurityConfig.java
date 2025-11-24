@@ -17,7 +17,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.config.Customizer;
 
 import java.util.Arrays;
 import java.util.List;
@@ -53,10 +52,12 @@ public class SecurityConfig {
                         .disable()
                 )
 
-                // AUTH
+                // AUTH: PATTERN MÁS ESPECÍFICO
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/chatbot/consulta-stream").permitAll()
-                        .requestMatchers("/api/chatbot/consulta").permitAll()
+                        // ✅ CHATBOT: TODAS LAS RUTAS PÚBLICAS
+                        .requestMatchers("/api/chatbot/**").permitAll()
+
+                        // Otras rutas públicas
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/productos/**").permitAll()
                         .requestMatchers("/api/barrios/**").permitAll()
@@ -64,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/sucursales/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers("/api/debug/**").permitAll()
+
+                        // TODAS LAS DEMÁS RUTAS REQUIEREN AUTH
                         .anyRequest().authenticated()
                 )
 
@@ -78,7 +81,7 @@ public class SecurityConfig {
 
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint));
 
-        // JWT FILTER
+        // JWT FILTER: SOLO PARA RUTAS PRIVADAS
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
