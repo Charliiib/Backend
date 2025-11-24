@@ -76,15 +76,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🔥 ORÍGENES DESDE TU YML
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
-
-        // 🔥 MÉTODOS PERMITIDOS
-        configuration.setAllowedMethods(Arrays.asList(
-                "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
+        //  ORÍGENES ESPECÍFICOS PARA VERCEL + LOCAL
+        configuration.setAllowedOrigins(Arrays.asList(
+                "https://frontend-pi-jet-42.vercel.app",
+                "https://frontend-git-main-charlis-projects-6b04c52b.vercel.app",
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:5174"
         ));
 
-        // 🔥 HEADERS PERMITIDOS (CRÍTICO para SSE)
+        //  MÉTODOS PERMITIDOS
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
+
+        //  HEADERS PERMITIDOS (CRÍTICO para SSE)
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -94,23 +98,17 @@ public class SecurityConfig {
                 "Access-Control-Request-Method",
                 "Access-Control-Request-Headers",
                 "Cache-Control",
-                "Pragma",
-                "Last-Event-ID", // 🔥 CRÍTICO para SSE
-                "Accept-Encoding",
-                "Accept-Language"
+                "Last-Event-ID", //  IMPORTANTE para SSE
+                "Accept-Encoding"
         ));
 
-        // 🔥 HEADERS EXPUESTOS (CRÍTICO para SSE)
+        //  HEADERS EXPUESTOS (CRÍTICO para SSE)
         configuration.setExposedHeaders(Arrays.asList(
-                "Authorization",
                 "Content-Type",
                 "Access-Control-Allow-Origin",
                 "Access-Control-Allow-Methods",
-                "Access-Control-Allow-Headers",
                 "Cache-Control",
-                "Content-Encoding",
-                "Last-Event-ID", // 🔥 CRÍTICO para SSE
-                "X-Accel-Buffering" // 🔥 PARA RAILWAY
+                "Last-Event-ID" //  IMPORTANTE para SSE
         ));
 
         configuration.setAllowCredentials(true);
@@ -119,7 +117,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
 
-        System.out.println("🌍 CORS Configurado para Railway con orígenes: " + Arrays.toString(allowedOrigins));
+        System.out.println("CORS Configurado para Vercel + Railway");
         return source;
     }
 

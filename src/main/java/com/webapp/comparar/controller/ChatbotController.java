@@ -6,14 +6,11 @@ import com.webapp.comparar.dto.BuscarProductosRequest;
 import com.webapp.comparar.dto.IngredienteEncontrado;
 import com.webapp.comparar.service.ChatbotService;
 import com.webapp.comparar.service.ChatbotProductosService;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/chatbot")
-@CrossOrigin(origins = "*") // 🔥 CORS GLOBAL para Railway
+@CrossOrigin(origins = "*") //  DEJA QUE SPRING MANEJE CORS
 public class ChatbotController {
 
     @Autowired
@@ -34,31 +31,20 @@ public class ChatbotController {
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader,
-            HttpServletResponse response) {
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
-        System.out.println("🎯 SOLUCIÓN RAILWAY: Solicitud recibida -> " + mensaje);
+        System.out.println(" SOLUCIÓN RAILWAY CORS: Solicitud recibida -> " + mensaje);
 
-        // 🔥 HEADERS CORS MANUALES CRÍTICOS para Railway
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS, POST");
-        response.setHeader("Access-Control-Allow-Headers", "*");
-        response.setHeader("Access-Control-Expose-Headers", "*");
-        response.setHeader("Access-Control-Max-Age", "3600");
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("Connection", "keep-alive");
-        response.setHeader("X-Accel-Buffering", "no"); // 🔥 CRÍTICO para Nginx/Railway
+        //  TIMEOUT EXTENDIDO para Railway
+        SseEmitter emitter = new SseEmitter(120000L); // 2 minutos
 
-        // ⬅️ TIMEOUT EXTENDIDO para Railway (coincide con tu YML)
-        SseEmitter emitter = new SseEmitter(180000L); // 3 minutos
-
-        // 🔥 CONFIGURACIÓN MEJORADA RAILWAY
+        // CONFIGURACIÓN BÁSICA
         emitter.onCompletion(() -> {
             System.out.println("✅ SSE Completado normalmente en Railway");
         });
 
         emitter.onTimeout(() -> {
-            System.out.println("⏰ SSE Timeout (3min) en Railway");
+            System.out.println("⏰ SSE Timeout (2min) en Railway");
             emitter.complete();
         });
 
@@ -72,19 +58,6 @@ public class ChatbotController {
         });
 
         boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
-
-        // 🔥 ENVIAR EVENTO INICIAL INMEDIATO para mantener conexión
-        try {
-            Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🔄 Conectando con chef virtual...");
-            inicioEvent.put("type", "inicio");
-            inicioEvent.put("timestamp", System.currentTimeMillis());
-            emitter.send(SseEmitter.event().name("inicio").data(inicioEvent));
-        } catch (Exception e) {
-            System.err.println("❌ Error enviando evento inicial: " + e.getMessage());
-            emitter.complete();
-            return emitter;
-        }
 
         // EJECUTAR EN HILO SEPARADO INMEDIATAMENTE
         CompletableFuture.runAsync(() -> {
@@ -111,7 +84,7 @@ public class ChatbotController {
         return emitter;
     }
 
-    // 🔥 ENDPOINT DE HEALTH CHECK ESPECÍFICO para Railway
+    //  ENDPOINT DE HEALTH CHECK
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> healthCheck() {
         Map<String, Object> response = new HashMap<>();
@@ -123,14 +96,9 @@ public class ChatbotController {
         return ResponseEntity.ok(response);
     }
 
-    // 🔥 ENDPOINT DE TEST SSE SIMPLE para Railway
+    //  ENDPOINT DE TEST SSE SIMPLE
     @GetMapping(value = "/test-sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter testSSE(HttpServletResponse response) {
-        // Headers CORS
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "GET");
-        response.setHeader("Cache-Control", "no-cache");
-
+    public SseEmitter testSSE() {
         SseEmitter emitter = new SseEmitter(30000L);
 
         CompletableFuture.runAsync(() -> {
@@ -156,6 +124,7 @@ public class ChatbotController {
         return emitter;
     }
 
+    // ... (mantener los otros métodos igual)
     @PostMapping("/consulta")
     public ResponseEntity<ChatbotResponse> consultarRecetaConProductos(
             @RequestBody ChatbotRequest request,
