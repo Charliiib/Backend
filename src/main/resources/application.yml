@@ -65,7 +65,7 @@ google:
     api:
       # 🔥 CRÍTICO: Variable de entorno OBLIGATORIA para Railway
       # Debes configurar GOOGLE_AI_API_KEY en Railway Dashboard
-      key: ${GOOGLE_AI_API_KEY}
+      key: ${GOOGLE.AI.API.KEY}
 
 # Logging simplificado para Railway
 logging:
@@ -121,7 +121,7 @@ spring:
 google:
   ai:
     api:
-      key: ${GOOGLE_AI_API_KEY:AIzaSyB-your-dev-key-here}
+      key: ${GOOGLE.AI.API.KEY:AIzaSyB-your-dev-key-here}
 
 logging:
   level:
