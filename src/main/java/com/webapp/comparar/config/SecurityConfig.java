@@ -79,7 +79,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:3000",
                 "https://frontend-pi-jet-42.vercel.app",
-                "https://frontend-cdfgwkdfp-chartie-projects-6b04c52b.vercel.app",
+                "https://frontend-production-33d4.up.railway.app",
                 "https://*.vercel.app"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
