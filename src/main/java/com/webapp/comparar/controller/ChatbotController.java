@@ -56,12 +56,13 @@ public class ChatbotController {
         // 4. Iniciar la lógica de Gemini de forma Asíncrona (la parte lenta)
         CompletableFuture.runAsync(() -> {
             try {
+                // Llama a tu servicio para obtener la respuesta de Gemini
                 emitter.send(SseEmitter.event().name("ping").data("Conexión establecida."));
 
-                // 💥PRUEBA CRÍTICA: Esperar para ver si el proxy aún rompe la conexión después del PING
+                // 💥 PRUEBA CRÍTICA: Esperar para ver si el proxy aún rompe la conexión después del PING
                 Thread.sleep(10000); // 10 segundos de espera
 
-                chatbotService.obtenerRespuestaConStreaming(mensaje, token, emitter);
+                chatbotService.obtenerRespuestaConStreaming(mensaje, isAuthenticated, emitter);
 
             } catch (Exception e) {
                 emitter.completeWithError(e);
