@@ -32,17 +32,20 @@ public class ChatbotController {
     @GetMapping(value = "/consulta-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter consultarRecetaConStreaming(
             @RequestParam String mensaje,
-            @RequestHeader(value = "Authorization", required = false) String authHeader, HttpServletResponse response) {
+            // :white_check_mark: CAMBIO CLAVE: Usamos @RequestParam para recibir el token de la URL
+            @RequestParam(value = "token", required = false) String token,
+            HttpServletResponse response) {
 
+        // Headers de control de Proxy/SSE (¡déjalos, son correctos!)
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Connection", "keep-alive");
-        System.out.println("🎯 CHATBOT ENDPOINT ACCEDIDO - Debería ser público");
-        System.out.println("📝 Mensaje: " + mensaje);
-        System.out.println("🔐 Auth Header presente: " + (authHeader != null));
-        System.out.println("🔐 Authentication en contexto: " + SecurityContextHolder.getContext().getAuthentication());
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // 2 minutos timeout
-        boolean isAuthenticated = authHeader != null && authHeader.startsWith("Bearer ");
 
+        System.out.println(":dart: CHATBOT ENDPOINT ACCEDIDO - Debería ser público");
+        System.out.println(":pencil: Mensaje: " + mensaje);
+        // :white_check_mark: Nuevo check de autenticación usando el 'token' de la URL
+        boolean isAuthenticated = token != null && !token.isEmpty();
+
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // 2 minutos timeout
 // 3. 💥 ENVIAR EL PRIMER DATO INMEDIATAMENTE 💥
         try {
             // Envía un evento simple o un comentario
