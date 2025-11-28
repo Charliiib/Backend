@@ -44,7 +44,7 @@ public class ChatbotService {
 
             // 1. Evento de inicio
             Map<String, Object> inicioEvent = new HashMap<>();
-            inicioEvent.put("data", "🤖 Analizando tu consulta" +
+            inicioEvent.put("data", "🤖 Escribiendo respuesta" +
                     "<span class='dot-animation'>.</span>" +
                     "<span class='dot-animation' style='animation-delay: 0.2s;'>.</span>" +
                     "<span class='dot-animation' style='animation-delay: 0.4s;'>.</span>");

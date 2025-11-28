@@ -36,3 +36,4 @@ application-secret.properties
 application.properties
 application.log
 application.log.2025-11-23.0.gz
+application.log.2025-11-24.0.gz
